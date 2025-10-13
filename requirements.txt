@@ -1,0 +1,17 @@
+# Star Conflict Chat Translator - Dependencies
+# Required external packages for the SC Chat Translator application
+
+# GUI Framework
+customtkinter>=5.2.0
+
+# Image Processing (for icons and assets)
+Pillow>=9.0.0
+
+# Translation Services
+googletrans>=4.0.0rc1
+
+# Clipboard Operations
+pyperclip>=1.8.0
+
+# Note: Standard library modules (tkinter, sqlite3, json, logging, etc.)
+# are included with Python and don't need to be installed separately
