@@ -1,0 +1,26 @@
+include README.md
+include LICENSE
+include CONTRIBUTING.md
+include CHANGELOG.md
+include requirements.txt
+include pyproject.toml
+include .gitignore
+
+recursive-include assets *
+recursive-include docs *
+
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude __pycache__
+global-exclude .pytest_cache
+global-exclude .coverage
+global-exclude *.log
+global-exclude .DS_Store
+global-exclude Thumbs.db
+
+exclude output
+exclude .venv
+exclude .git
+exclude build
+exclude dist
+exclude *.egg-info
