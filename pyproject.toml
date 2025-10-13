@@ -1,0 +1,128 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "star-conflict-chat-translator"
+version = "1.1.3"
+description = "Real-time multilingual chat translation for Star Conflict"
+readme = "Github Docs/README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Hystrix", email = "borutaproject@gmail.com"}
+]
+keywords = ["translation", "gaming", "chat", "multilingual", "star-conflict"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Games/Entertainment",
+    "Topic :: Utilities"
+]
+requires-python = ">=3.8"
+dependencies = [
+    "customtkinter>=5.2.0",
+    "Pillow>=9.0.0",
+    "googletrans>=4.0.0rc1",
+    "pyperclip>=1.8.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/boruta-project/star-conflict-chat-translator"
+Repository = "https://github.com/boruta-project/star-conflict-chat-translator"
+Issues = "https://github.com/boruta-project/star-conflict-chat-translator/issues"
+Documentation = "https://github.com/boruta-project/star-conflict-chat-translator/blob/main/README.md"
+
+[project.scripts]
+sc-chat-translator = "main:main"
+
+[tool.setuptools]
+packages = ["."]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["main", "test_remote_welcome"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "customtkinter.*",
+    "googletrans.*",
+    "PIL.*"
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --cov=main --cov-report=html --cov-report=term-missing"
+testpaths = [
+    "tests",
+]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.coverage.run]
+source = ["main"]
+omit = [
+    "*/venv/*",
+    "*/.venv/*",
+    "*/__pycache__/*",
+    "*/tests/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod"
+]
