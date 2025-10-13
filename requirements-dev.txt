@@ -1,0 +1,24 @@
+# Development dependencies for Star Conflict Chat Translator
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+
+# Code quality
+flake8>=6.0.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.0.0
+
+# Documentation
+mkdocs>=1.4.0
+mkdocs-material>=9.0.0
+
+# Build tools
+pyinstaller>=5.0.0
+setuptools>=65.0.0
+wheel>=0.37.0
+
+# Development tools
+pre-commit>=3.0.0
