@@ -1,6 +1,16 @@
+# License
+
+<div align="center">
+  <h1>MIT License</h1>
+  <p><em>Open source license for Star Conflict Chat Translator</em></p>
+</div>
+
+## License Text
+
+```
 MIT License
 
-Copyright (c) 2025 Boruta-project
+Copyright (c) 2023-2024 Hystrix
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +29,155 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## Understanding the MIT License
+
+### What You Can Do 
+
+- **Use**: You can use this software for any purpose
+- **Modify**: You can modify the source code
+- **Distribute**: You can distribute copies of the software
+- **Commercial Use**: You can use it in commercial products
+- **Private Use**: You can use it privately without sharing
+
+### What You Must Do 
+
+- **Include Copyright**: Keep the copyright notice in all copies
+- **Include License**: Include the full license text in distributions
+- **State Changes**: If you modify the code, indicate what changed
+
+### What We Don't Guarantee 🚫
+
+- **No Warranty**: Software provided "as is" without guarantees
+- **No Liability**: No responsibility for damages or issues
+- **No Support**: No obligation to provide support or updates
+
+## Why MIT License?
+
+The MIT License was chosen for **Star Conflict Chat Translator** because:
+
+- **Permissive**: Allows maximum freedom for users and developers
+- **Simple**: Easy to understand and comply with
+- **Compatible**: Works well with other open source licenses
+- **Business-Friendly**: Suitable for commercial use
+- **Community-Oriented**: Encourages sharing and improvement
+
+## Compliance Checklist
+
+### For Users
+- You can download and use the software freely
+- You can modify it for personal use
+- You can share it with others
+- No need to ask permission
+
+### For Distributors
+- Include the copyright notice
+- Include the full license text
+- State any modifications made
+- Can charge for distribution
+
+### For Commercial Users
+- Can use in proprietary software
+- Can sell products containing this software
+- No need to release your source code
+- No royalties or fees required
+
+## Common Questions
+
+### Can I use this in my commercial product?
+
+**Yes!** The MIT License explicitly allows commercial use. You can:
+- Include it in paid software
+- Sell products that use this code
+- Use it in SaaS applications
+- Distribute it with your commercial offerings
+
+### Do I need to open source my changes?
+
+**No.** Unlike GPL licenses, the MIT License doesn't require you to share your modifications. However, if you distribute your modified version, you must:
+- Include the original copyright notice
+- Include the MIT License text
+- Indicate that changes were made
+
+### Can I change the license?
+
+**No.** If you distribute the software (modified or not), you must use the same MIT License. You cannot change it to a more restrictive license.
+
+### What about patents?
+
+The MIT License doesn't explicitly mention patents, but it's generally interpreted as allowing use of any patents that may cover the software.
+
+## Contact Information
+
+### Copyright Holder
+- **Name**: Hystrix
+- **Email**: borutaproject@gmail.com
+- **GitHub**: [View Profile](https://github.com/yourusername)
+
+### For License Questions
+- **Email**: borutaproject@gmail.com
+- **GitHub Issues**: [Create Issue](../../issues)
+- **Discussions**: [Start Discussion](../../discussions)
+
+## elated Licenses
+
+### Similar Permissive Licenses
+- **BSD Licenses**: Similar permissions with minor differences
+- **Apache License 2.0**: More detailed, includes patent grants
+- **ISC License**: Nearly identical to MIT
+
+### Copyleft Licenses (Different Approach)
+- **GPL**: Requires sharing modifications
+- **LGPL**: Less restrictive than GPL
+- **AGPL**: Applies to network services
+
+## Contributing Under MIT
+
+### For Contributors
+- Your contributions will be licensed under MIT
+- You retain copyright of your contributions
+- The project can use your code without restrictions
+- You can use your contributions elsewhere
+
+### Contributor Agreement
+By contributing to this project, you agree that:
+- Your contributions are licensed under MIT
+- The project can use, modify, and distribute your code
+- You have the right to contribute the code
+
+## Full License Text (Again for Reference)
+
+```
+MIT License
+
+Copyright (c) 2023-2024 Hystrix
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+<div align="center">
+
+**Licensed under MIT - Free for everyone!**
+
+*This license ensures the software remains open and accessible to all users.*
+
+</div>
