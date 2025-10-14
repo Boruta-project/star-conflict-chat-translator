@@ -26,7 +26,7 @@
 
 ```bash
 # Clone and setup in one command
-git clone https://github.com/boruta-project/star-conflict-chat-translator.git
+git clone https://github.com/yourusername/star-conflict-chat-translator.git
 cd star-conflict-chat-translator
 python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt -r requirements-dev.txt
