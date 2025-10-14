@@ -142,5 +142,5 @@ echo "1. Activate environment: source venv/bin/activate"
 echo "2. Run application: python main.py"
 echo "3. Run tests: python -m pytest"
 echo
-echo "Happy translating! 🌍"
+echo "Happy translating!"
 echo
