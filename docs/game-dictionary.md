@@ -115,18 +115,6 @@ This placement ensures:
 3. **Test** in-game with relevant chat messages
 4. **Verify** the translation improves
 
-## 📊 Current Dictionary Status
-
-| Category | Entries | Status |
-|----------|---------|--------|
-| Ship Names | 200+ | 🟢 Active |
-| Weapons | 5 | 🟢 Active |
-| Terminology | 4 | 🟢 Active |
-| Resources | 3 | 🟢 Active |
-| **Total** | **212+** | 🟢 Growing |
-
-*Last updated: 2024*
-
 ## 🎯 Impact of Contributions
 
 Your dictionary contributions help:
