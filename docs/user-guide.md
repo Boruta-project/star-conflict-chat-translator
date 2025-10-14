@@ -50,7 +50,7 @@ Before you begin, ensure your system meets these requirements:
 
 #### Option A: Pre-built Executable (Recommended)
 
-1. **Visit** the [Releases](../../releases) page on GitHub
+1. **Visit** the [Releases](https://sites.google.com/view/sc-chat-translator) page on GoogleSites
 2. **Download** the latest version for your operating system:
    - `SC_Chat_Translator_Windows.zip` for Windows
    - `SC_Chat_Translator_Linux.tar.gz` for Linux (currently unavailable)
@@ -252,7 +252,7 @@ Output:
 → Selling cheap modules
 ```
 
-### Exporting History (Not yet implemented)
+### Exporting History (not yet implemented)
 
 #### CSV Export Feature
 
