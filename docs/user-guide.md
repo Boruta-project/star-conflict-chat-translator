@@ -412,7 +412,7 @@ The application includes a built-in dictionary for game-specific terms:
   "xpam": "temple",
   "cnc": "thank you",
   "co+": "spec ops +",
-  "cow": "spec ops +"
+  "cow+": "spec ops +"
 }
 ```
 
