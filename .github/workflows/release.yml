@@ -1,0 +1,88 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: 'v1.1.3'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+        - os: windows-latest
+          target: windows
+        - os: ubuntu-latest
+          target: linux
+        - os: macos-latest
+          target: macos
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install build dependencies
+      run: pip install -r requirements-build.txt
+
+    - name: Build executable
+      run: python build/build.py --target ${{ matrix.target }}
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: executables-${{ matrix.target }}
+        path: dist/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Create source archive
+      run: |
+        python build/build.py --release
+        cp dist/*.zip ./artifacts/
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: "Star Conflict Chat Translator ${{ github.ref_name }}"
+        body: |
+          ## Changes in this release
+
+          ### Downloads
+          - **Windows**: Download `SC_Chat_Translator_${{ github.ref_name }}_Windows.exe`
+          - **Linux**: Download `SC_Chat_Translator_${{ github.ref_name }}_Linux`
+          - **macOS**: Download `SC_Chat_Translator_${{ github.ref_name }}_macOS.app`
+          - **Source Code**: Download source archive
+
+          ### Installation
+          1. Download the appropriate executable for your platform
+          2. Run the installer or extract the archive
+          3. Launch the application
+
+          ### System Requirements
+          - Windows 10+, Ubuntu 18.04+, or macOS 10.14+
+          - 256 MB RAM minimum
+          - Internet connection for translations
+        files: ./artifacts/**/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
