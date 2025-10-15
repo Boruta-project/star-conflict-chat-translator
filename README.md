@@ -1,4 +1,3 @@
-# Star Conflict Chat Translator
 
 <div align="center">
   <h1>🌍 Real-time Multilingual Chat Translation for Star Conflict</h1>
@@ -46,9 +45,9 @@ The application monitors your game's chat logs in real-time, translates messages
 ## 🎯 Key Features
 
 ### 🌍 **Multilingual Support**
-- **Customizable Language Support**: Configure your preferred languages through Google Translate settings
-- **12 Default Languages Included**: Possibility to choose from 12 languages ​​supported by Google Translator, e.g. English, Spanish, French, German, Polish, Portuguese, Russian, Japanese, Arabic, Hindi
-- - **Automatic Language Detection**: Smart detection of message languages
+- **Customizable Language Support**: Configure your preferred languages through Google Translate settings 
+- **12 Default Languages Included**: Possibility to choose from 12 languages ​​supported by Google Translate, e.g. English, Spanish, French, German, Italian, Polish, Portuguese, Russian, Japanese, Chinese (Simplified), Arabic, Hindi
+- **Automatic Language Detection**: Smart detection of message languages
 - **Bidirectional Translation**: Translate to and from any configured language
 
 ### ⚡ **Real-time Translation**
@@ -86,7 +85,7 @@ The application monitors your game's chat logs in real-time, translates messages
 
 ### For Users (Pre-built Executable)
 
-1. **Download** the latest release from the [Releases](https://sites.google.com/view/sc-chat-translator) page
+1. 1. **Download** the latest release from the [Download page](https://sites.google.com/view/sc-chat-translator) or from [Releases](../../releases)
 2. **Extract** the ZIP file to your preferred location
 3. **Run** `SC_Chat_Translator.exe` (Windows) or the appropriate executable for your platform
 4. **Configure** your preferred translation language in Settings
@@ -137,7 +136,7 @@ python main.py
 
 ### Option 1: Pre-built Executable (Recommended for Users)
 
-1. Visit the [Releases](https://sites.google.com/view/sc-chat-translator) page
+1. Visit the [Releases](../../releases) or the [Download page](https://sites.google.com/view/sc-chat-translator)
 2. Download the latest version for your operating system
 3. Extract the archive to your desired location
 4. Run the executable file
