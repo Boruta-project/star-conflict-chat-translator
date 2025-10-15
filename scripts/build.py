@@ -87,7 +87,7 @@ def create_zip_archive():
     import zipfile
     from datetime import datetime
 
-    version = "1.1.2"  # Should be read from main.py
+    version = "1.1.3"  # Should be read from main.py
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     zip_name = f"sc_translator_{version}_{timestamp}.zip"
 
