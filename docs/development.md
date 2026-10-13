@@ -215,10 +215,6 @@ star-conflict-chat-translator/
 │   ├── install_windows.bat         # Windows installer
 │   ├── install_linux.sh            # Linux installer
 │   └── install_macos.sh            # macOS installer
-├── src/                            # Source code
-│   └── sc_translator/              # Main package
-│       ├── __init__.py
-│       └── main.py                 # Main application module
 ├── tests/                          # Unit tests
 │   ├── __init__.py
 │   ├── test_main.py                # Main module tests
