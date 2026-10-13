@@ -45,7 +45,10 @@ jobs:
         run: flake8 main.py tests scripts --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Run tests
-        run: pytest --no-cov -q
+        shell: bash
+        # Some tests open a Tk window; Linux runners need a virtual display for that
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then xvfb-run -a pytest --no-cov -q; else pytest --no-cov -q; fi
 
   build-windows:
     name: Build Windows exe

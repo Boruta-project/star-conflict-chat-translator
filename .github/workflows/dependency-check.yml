@@ -31,4 +31,7 @@ jobs:
           pip install --upgrade -r requirements.txt -r requirements-dev.txt
           pip freeze
       - name: Run tests
-        run: pytest --no-cov -q
+        shell: bash
+        # Some tests open a Tk window; Linux runners need a virtual display for that
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then xvfb-run -a pytest --no-cov -q; else pytest --no-cov -q; fi
