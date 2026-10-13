@@ -10,6 +10,11 @@ All notable changes to **Star Conflict Chat Translator** will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Developer notes
+- `SHA256SUMS.txt` uses LF line endings, so `sha256sum -c` works on Linux and in Git Bash.
+
 ## [1.4.1] - 2026-10-13
 
 ### Added

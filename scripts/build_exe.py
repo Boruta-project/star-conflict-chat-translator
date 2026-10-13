@@ -67,7 +67,8 @@ def write_checksums(files):
     for f in files:
         digest = hashlib.sha256(f.read_bytes()).hexdigest()
         lines.append(f"{digest}  {f.name}")
-    (DIST / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # LF line endings, so `sha256sum -c SHA256SUMS.txt` also works on Linux/Git Bash
+    (DIST / "SHA256SUMS.txt").write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
 
 
 def main():
