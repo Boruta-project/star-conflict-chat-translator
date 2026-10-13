@@ -1,0 +1,13 @@
+# Store and check out text files with LF line endings on every platform.
+# Without this, Git for Windows' default core.autocrlf=true expects CRLF in the
+# working tree and reports every LF file as modified.
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.gif binary
+*.ttf binary
+*.otf binary
