@@ -748,7 +748,7 @@ Main application class handling GUI and file monitoring.
 
 **Attributes:**
 - `settings`: Application configuration dictionary
-- `translator`: Google Translate instance
+- `translation_service`: MyMemory translation (via the `translate` package)
 - `text_area_tab1`: Main chat display widget
 
 #### `ToolTip`

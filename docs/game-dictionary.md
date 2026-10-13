@@ -7,7 +7,7 @@
 
 ## 📖 Overview
 
-The **Star Conflict Game Dictionary** is a community-maintained collection of game-specific terms, phrases, and translations that help improve the accuracy of chat message translations. While the application uses Google Translate for general language translation, this dictionary provides specialized translations for:
+The **Star Conflict Game Dictionary** is a community-maintained collection of game-specific terms, phrases, and translations that help improve the accuracy of chat message translations. While the application uses a general-purpose translation service (MyMemory), this dictionary provides specialized translations for:
 
 - **Ship names and classes** (Tornado, Mammoth, Kusarigama)
 - **Weapon and equipment names** (Plasma Gun, Tai'thaq 17)

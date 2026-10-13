@@ -38,7 +38,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jacek-mar/star-conflict-chat-translator"
+Homepage = "https://jacek-mar.github.io/star-conflict-chat-translator/"
 Repository = "https://github.com/jacek-mar/star-conflict-chat-translator"
 Issues = "https://github.com/jacek-mar/star-conflict-chat-translator/issues"
 Documentation = "https://github.com/jacek-mar/star-conflict-chat-translator/blob/main/README.md"

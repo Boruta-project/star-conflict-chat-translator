@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% if page.url == "/" %}
+  <title>{{ site.title }} – real-time chat translation for Star Conflict</title>
+  {% else %}
+  <title>{{ page.title | default: site.title }} · {{ site.title }}</title>
+  {% endif %}
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  <link rel="icon" href="{{ '/assets/images/favicon.png' | relative_url }}">
+  <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}">
+</head>
+<body class="{% if page.url == '/' %}home{% else %}doc{% endif %}">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="{{ '/' | relative_url }}">
+        <img src="{{ '/assets/images/favicon.png' | relative_url }}" alt="" width="24" height="24">
+        <span>SC Chat Translator</span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a href="{{ '/user-guide.html' | relative_url }}">User Guide</a>
+        <a href="{{ '/translation-service.html' | relative_url }}">Translation &amp; limits</a>
+        <a href="{{ '/troubleshooting.html' | relative_url }}">Help</a>
+        <a href="https://github.com/{{ site.repository }}">GitHub</a>
+        <a class="nav-cta" href="https://github.com/{{ site.repository }}/releases/latest">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% if page.url == "/" %}
+      {{ content }}
+    {% else %}
+      <article class="wrap prose">
+        {{ content }}
+      </article>
+    {% endif %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p>
+        Free and open source (MIT) ·
+        <a href="https://github.com/{{ site.repository }}">Source code</a> ·
+        <a href="https://github.com/{{ site.repository }}/issues">Report a problem</a> ·
+        <a href="https://github.com/{{ site.repository }}/blob/main/CHANGELOG.md">Changelog</a>
+      </p>
+      <p class="muted">A fan-made tool. Not affiliated with or endorsed by the makers of Star Conflict.
+        Translations by <a href="https://mymemory.translated.net/">MyMemory</a>.</p>
+    </div>
+  </footer>
+</body>
+</html>

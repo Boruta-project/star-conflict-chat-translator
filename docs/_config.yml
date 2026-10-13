@@ -1,0 +1,30 @@
+# GitHub Pages site for SC Chat Translator, built from this docs/ folder.
+# Built and deployed by .github/workflows/pages.yml (Settings → Pages → Source: GitHub Actions).
+# Site: https://jacek-mar.github.io/star-conflict-chat-translator/
+title: SC Chat Translator
+description: Real-time chat translation for Star Conflict. Free, open source, Windows.
+baseurl: /star-conflict-chat-translator
+repository: jacek-mar/star-conflict-chat-translator
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# Plugins GitHub Pages enables by default; listed so the behaviour is explicit:
+# .md links become .html links, pages need no front matter, titles come from the first heading.
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-titles-from-headings
+relative_links:
+  enabled: true
+  collections: false
+titles_from_headings:
+  strip_title: false
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

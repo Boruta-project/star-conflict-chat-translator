@@ -1,0 +1,44 @@
+# Project website (GitHub Pages) built from docs/ with GitHub's own Jekyll builder.
+# One-time setup on jacek-mar: Settings → Pages → Source: "GitHub Actions".
+# Site: https://jacek-mar.github.io/star-conflict-chat-translator/
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Only the primary repository publishes the site (forks/mirrors would duplicate it)
+    if: github.repository == 'jacek-mar/star-conflict-chat-translator'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

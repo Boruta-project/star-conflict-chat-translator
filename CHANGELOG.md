@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Translated Channels** (Settings): a checkbox for every chat channel, all ticked by default. Unticked channels are still shown and saved, just not translated, which saves the free daily limit. Explained in [Translation Service](docs/translation-service.md#translate-only-the-channels-you-need).
 
+- **Project website** at https://jacek-mar.github.io/star-conflict-chat-translator/ (GitHub Pages, built from `docs/`).
+
 ### Changed
 - Settings → Translation Service: the status line under the email field only takes up space while it shows a message.
 

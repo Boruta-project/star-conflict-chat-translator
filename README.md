@@ -9,6 +9,7 @@
   <br>
   <img src="https://img.shields.io/badge/Game-Star%20Conflict-orange.svg" alt="Game">
   <img src="https://img.shields.io/badge/Translation-12%20Languages-blue.svg" alt="Languages">
+  <p><b><a href="https://jacek-mar.github.io/star-conflict-chat-translator/">Website</a></b> · <a href="https://github.com/jacek-mar/star-conflict-chat-translator/releases/latest">Download</a> · <a href="docs/user-guide.md">User Guide</a></p>
 </div>
 
 ## 📖 Table of Contents
