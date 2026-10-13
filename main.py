@@ -29,7 +29,7 @@ from urllib.error import URLError, HTTPError
 # Global configuration
 # -----------------------
 
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 APP_AUTHOR = "Hystrix"
 AUTHOR_EMAIL = "borutaproject@gmail.com"
 

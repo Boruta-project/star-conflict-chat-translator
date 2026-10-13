@@ -221,3 +221,6 @@ sc_translator_app_3.code-workspace
 
 # Local test profile created by scripts/run_sandbox.py
 .sandbox/
+
+# User notes directory 
+_user_notes/
