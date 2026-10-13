@@ -1,9 +1,10 @@
 name: Create Release
 
+# Manual only. The automatic run on 'v*' tags was disabled because build/build.py
+# still builds as version 1.1.3 and the job does not install requirements.txt, so it
+# published broken executables. Until that is fixed, releases are built locally
+# (docs/building-executables.md) and uploaded by hand.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
