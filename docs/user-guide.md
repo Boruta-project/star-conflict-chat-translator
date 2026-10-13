@@ -390,6 +390,10 @@ Translation runs through MyMemory's free API, capped at 5,000 characters/day ano
 
 The Settings tab links to a plain-language explanation of why the email raises the limit and why the app no longer uses Google Translate: **[Translation Service](translation-service.md)**.
 
+#### Translated Channels
+
+Settings → **Translated Channels**: one checkbox per chat channel (Battle, Squad, Clan, Trading, private messages, and each general language chat). All are ticked by default. Untick a channel to stop translating it; its messages are still displayed and saved, only the translation line is left out. Fewer translated channels use less of the free daily limit; see [Translation Service](translation-service.md#translate-only-the-channels-you-need).
+
 ### Game Integration
 
 #### Automatic Path Detection

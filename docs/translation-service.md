@@ -5,6 +5,7 @@ This page explains, in plain terms:
 - [Why the app no longer uses Google Translate](#why-the-app-no-longer-uses-google-translate)
 - [How the free daily limit works](#how-the-free-daily-limit-works)
 - [Why entering your email raises the limit](#why-entering-your-email-raises-the-limit)
+- [Translate only the channels you need](#translate-only-the-channels-you-need)
 - [What happens to your email address](#what-happens-to-your-email-address)
 - [What happens when the limit is reached](#what-happens-when-the-limit-is-reached)
 - [Questions and answers](#questions-and-answers)
@@ -71,6 +72,24 @@ In practice:
 
 ---
 
+## Translate only the channels you need
+
+Every translated message uses part of the daily limit, roughly as many characters as the message is long. Busy channels such as **Trading** or a crowded general chat can use most of it before your squad or private messages come in.
+
+In **Settings → Translated Channels** you can untick the channels you don't need translated:
+
+- **All channels are ticked by default.** Nothing changes unless you untick something.
+- An unticked channel is **still shown** in the chat and saved in History, just without the translation line (and without using any of your limit).
+- **Translate all** and **Translate none** switch every channel at once. *Translate none* is useful if you only want the manual translation tool.
+- The setting is saved immediately and kept between sessions.
+
+A practical setup when you keep hitting the limit:
+
+1. First add your email (see above): ten times more translation, no other change.
+2. If that's still not enough, untick the channels you read least, typically **Trading** and general chats in languages you already understand.
+
+---
+
 ## What happens to your email address
 
 - It is saved **only on your computer**, in the app's `settings.json` file.
@@ -91,7 +110,7 @@ When MyMemory reports that the daily limit has been used up:
 3. One notice appears in the chat, and the status bar shows roughly when translation will resume.
 4. Translation **resumes automatically**; you don't need to restart the app.
 
-To avoid hitting the limit, add your email in **Settings → Translation Service (MyMemory)**.
+To avoid hitting the limit, add your email in **Settings → Translation Service (MyMemory)**, and/or translate fewer channels (**Settings → Translated Channels**).
 
 ---
 
@@ -102,6 +121,9 @@ No. It is entirely optional. Without it the app works the same, just with the sm
 
 **Can I use a secondary or "gaming" email address?**
 Yes. Any valid address that you control works.
+
+**Why are some messages shown without a translation?**
+Either their channel is unticked in **Settings → Translated Channels**, the message has no letters to translate, or MyMemory recognised it as already being in your language.
 
 **Does the email make translations better?**
 No. Translation quality is the same; only the daily allowance changes.

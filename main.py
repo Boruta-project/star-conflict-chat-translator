@@ -104,6 +104,8 @@ DEFAULT_SETTINGS = {
     # see docs/design-translate-library-migration.md. Never hard-code a shared email;
     # each user should use their own, or none.
     "mymemory_email": "",
+    # Channels NOT translated (opt-out list: empty = translate all, new channels are on)
+    "untranslated_channels": [],
     "languages": {
         "English": "en",
         "Spanish": "es",
@@ -205,6 +207,17 @@ COLOR_CATEGORIES = {
     "Priv_from": "MediumOrchid",
     "Priv_to": "MediumOrchid",
 }
+
+# Channels that can be excluded from translation (Settings → Translated Channels).
+# Names are CHAT_CATEGORIES values. Unticked channels are still displayed and saved;
+# only the translation request is skipped.
+CHANNEL_GROUPS = (
+    ("Channels", ("Battle", "Squad", "Clan", "Trading", "Priv_from", "Priv_to")),
+    ("General chats", ("English", "Russian", "Chinese", "German", "Italian", "French",
+                       "Spanish", "Japanese", "Portuguese", "Turkish", "Polish",
+                       "Hungarian", "Czech", "Ukrainian")),
+)
+CHANNEL_LABELS = {"Priv_from": "Private (received)", "Priv_to": "Private (sent)"}
 
 # Colors used to highlight different languages in the chat
 LANGUAGE_COLORS = [
@@ -902,6 +915,55 @@ class TranslatedFileWatcher(ctk.CTk):
         service_info_link.bind("<Button-1>", lambda e: self._open_link(TRANSLATION_SERVICE_INFO_URL))
         ToolTip(service_info_link, "Opens the explanation on GitHub in your web browser")
 
+        # ── Group 1c: Translated Channels ───────────────────────────────────────
+        grp_channels = ctk.CTkFrame(settings_scroll)
+        grp_channels.pack(fill="x", padx=5, pady=3)
+
+        ctk.CTkLabel(grp_channels, text="Translated Channels", font=_fnt_grp
+                     ).pack(anchor="w", padx=7, pady=(4, 2))
+
+        self.channel_vars = {}
+        for group_title, names in CHANNEL_GROUPS:
+            ctk.CTkLabel(grp_channels, text=f"{group_title}:", font=_fnt_hint, text_color="gray"
+                         ).pack(anchor="w", padx=7)
+            grid = ctk.CTkFrame(grp_channels, fg_color="transparent")
+            grid.pack(fill="x", padx=7, pady=(0, 3))
+            for i, name in enumerate(names):
+                var = tk.BooleanVar(value=self._is_channel_translated(name))
+                self.channel_vars[name] = var
+                ctk.CTkCheckBox(
+                    grid, text=CHANNEL_LABELS.get(name, name), variable=var, font=_fnt,
+                    checkbox_width=14, checkbox_height=14, border_width=2,
+                    command=lambda n=name, v=var: self._set_channel_translated(n, v.get()),
+                ).grid(row=i // 3, column=i % 3, sticky="w", padx=(0, 6), pady=1)
+
+        channel_btns = ctk.CTkFrame(grp_channels, fg_color="transparent")
+        channel_btns.pack(fill="x", padx=7, pady=(0, 3))
+        ctk.CTkButton(
+            channel_btns, text="Translate all", height=BUTTON_HEIGHT, width=90, font=_fnt,
+            command=lambda: self._set_all_channels_translated(True)
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(
+            channel_btns, text="Translate none", height=BUTTON_HEIGHT, width=90, font=_fnt,
+            command=lambda: self._set_all_channels_translated(False)
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            grp_channels,
+            text="Unticked channels are still shown in the chat, just not translated.\n"
+                 "Fewer translated channels use less of the free daily limit.",
+            font=_fnt_hint, text_color="gray", justify="left"
+        ).pack(anchor="w", padx=7, pady=(0, 1))
+
+        channels_info_link = ctk.CTkLabel(
+            grp_channels, text="How channels affect the daily limit — Read more",
+            font=_fnt_hint, text_color=LINK_COLOR, cursor=LINK_CURSOR
+        )
+        channels_info_link.pack(anchor="w", padx=7, pady=(0, 5))
+        channels_info_link.bind(
+            "<Button-1>", lambda e: self._open_link(TRANSLATION_SERVICE_INFO_URL + "#translate-only-the-channels-you-need")
+        )
+
         # ── Group 2: Game Logs Path ──────────────────────────────────────────────
         grp_path = ctk.CTkFrame(settings_scroll)
         grp_path.pack(fill="x", padx=5, pady=3)
@@ -1489,6 +1551,27 @@ copies or substantial portions of the Software."""
             self.status_label.configure(text=text)
         except Exception:
             pass
+
+    # ------------- Translated channels --------------
+    def _is_channel_translated(self, category):
+        return category not in self.settings.get("untranslated_channels", [])
+
+    def _set_channel_translated(self, category, translate):
+        off = [c for c in self.settings.get("untranslated_channels", []) if c != category]
+        if not translate:
+            off.append(category)
+        self.settings["untranslated_channels"] = off  # always a new list (not the default's)
+        self._save_settings()
+        self.logger.info(f"Channel {category}: translation {'on' if translate else 'off'}")
+
+    def _set_all_channels_translated(self, translate):
+        for var in self.channel_vars.values():
+            var.set(translate)
+        self.settings["untranslated_channels"] = (
+            [] if translate else [c for _, names in CHANNEL_GROUPS for c in names]
+        )
+        self._save_settings()
+        self.logger.info(f"All channels: translation {'on' if translate else 'off'}")
 
     def _set_email_status(self, text):
         self.mymemory_email_status.configure(text=text)
@@ -2236,7 +2319,10 @@ copies or substantial portions of the Software."""
                         ts, username, message_text, header_line, message_line = parsed
                         processed_message = self._apply_game_dictionary(message_text)
 
-                        translated = self._translate_for_display(processed_message, self.target_lang).text
+                        if self._is_channel_translated(category):
+                            translated = self._translate_for_display(processed_message, self.target_lang).text
+                        else:
+                            translated = ""  # channel unticked in Settings: shown, not translated
 
                         tag_name = f"translated_{self.target_lang}"
 
@@ -2246,8 +2332,11 @@ copies or substantial portions of the Software."""
                         # Insert the original message
                         self._insert_message_tab1(">   '" +message_line +"'", "original" )
 
-                        # Insert the translated line
-                        self._insert_message_tab1("→ " + translated + "\n", tag_name)
+                        # Insert the translated line (or just the spacing line)
+                        if translated:
+                            self._insert_message_tab1("→ " + translated + "\n", tag_name)
+                        else:
+                            self._insert_message_tab1("", "original")
 
                         # Save to DB
                         self._db_insert_message(ts, category, username, message_text, translated, self.target_lang, self.session_id)
