@@ -50,7 +50,7 @@ vm_stat | grep "Pages free"
 **Test 1: Python Import Test**
 ```bash
 python -c "import tkinter, customtkinter; print('GUI: OK')"
-python -c "from googletrans import Translator; print('Translation: OK')"
+python -c "from translate import Translator; print('Translation: OK')"
 ```
 
 **Test 2: Application Launch Test**
@@ -166,7 +166,7 @@ python main.py --test
 ### Issue: "Translation failed" Messages
 
 **Symptoms:**
-- Messages show "[Translation error]"
+- Messages show "[not translated – …]" (see the User Guide for what each message means)
 - Some translations work, others don't
 
 **Solutions:**
@@ -176,15 +176,16 @@ python main.py --test
    ping google.com
    ```
 
-2. **Test Google Translate Service:**
+2. **Test the Translation Service (MyMemory):**
    ```bash
-   python -c "from googletrans import Translator; t = Translator(); print(t.translate('Hello', dest='es'))"
+   python -c "from translate import Translator; print(Translator(to_lang='es').translate('Hello'))"
    ```
 
-3. **Rate Limiting:**
-   - Google Translate has usage limits
-   - Wait 5-10 minutes between tests
-   - Reduce translation frequency in settings
+3. **Rate Limiting / Daily Quota:**
+   - MyMemory's free tier caps usage at 5,000 characters/day anonymously (50,000/day with your own email in Settings → Translation Service)
+   - When the limit is reached the app pauses translation until it resets and shows the resume time; messages are still displayed
+   - Individual translation requests are also capped at ~500 characters
+   - Wait until the next day if the daily quota is exhausted, or reduce translation frequency
 
 4. **Language Support:**
    - Verify source language is supported
@@ -221,10 +222,13 @@ python main.py --test
 
 **Solutions:**
 
-1. **Increase Timeout Settings:**
+1. **Check the Underlying Request:**
    ```python
-   # In code (advanced users)
-   translator = Translator(timeout=10)
+   # In code (advanced users) — the `translate` package uses `requests` under the
+   # hood (hitting MyMemory's API, not Google), so standard network troubleshooting
+   # (proxies, DNS, firewall) applies.
+   from translate import Translator
+   translator = Translator(to_lang="es")
    ```
 
 2. **Check Network Speed:**
@@ -251,12 +255,12 @@ python main.py --test
 1. **Verify Game Path:**
    - Go to Settings → "Browse"
    - Navigate to Star Conflict logs folder
-   - Default: `Documents\My Games\StarConflict\logs`
+   - Default: `%LOCALAPPDATA%\Targem\StarConflict\logs` (older game versions: `Documents\My Games\StarConflict\logs`)
 
 2. **Check File Permissions:**
    ```bash
    # Windows
-   icacls "C:\Users\YourName\Documents\My Games\StarConflict\logs"
+   icacls "%LOCALAPPDATA%\Targem\StarConflict\logs"
 
    # Linux
    ls -la ~/Documents/My\ Games/StarConflict/logs
@@ -380,7 +384,7 @@ python main.py --test
 ### Issue: "Connection refused" Errors
 
 **Symptoms:**
-- Unable to connect to Google Translate
+- Unable to connect to the translation service (MyMemory)
 - Network timeout errors
 
 **Solutions:**
@@ -394,13 +398,13 @@ python main.py --test
 
 2. **DNS Issues:**
    ```bash
-   nslookup translate.googleapis.com
+   nslookup api.mymemory.translated.net
    ```
 
 3. **VPN/Anti-virus Interference:**
    - Temporarily disable VPN
    - Check anti-virus firewall rules
-   - Add exception for Python/Google Translate
+   - Add exception for Python/api.mymemory.translated.net
 
 ### Issue: Slow Translations
 
@@ -418,7 +422,7 @@ python main.py --test
    ```
 
 2. **Server Location:**
-   - Google Translate routes to nearest server
+   - MyMemory routes through its own infrastructure; response times vary by region
    - VPN may route to slower servers
 
 3. **Concurrent Requests:**
@@ -531,11 +535,10 @@ if "--debug" in sys.argv:
 
 **Test Individual Components:**
 ```python
-# Test translation service
-from googletrans import Translator
-translator = Translator()
-result = translator.translate("Test message", dest="es")
-print(f"Translation: {result.text}")
+# Test translation service (MyMemory, via the `translate` package)
+from translate import Translator
+result = Translator(to_lang="es").translate("Test message")
+print(f"Translation: {result}")
 
 # Test file monitoring
 import os

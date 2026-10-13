@@ -148,7 +148,7 @@ if %errorlevel% neq 0 (
     echo WARNING: GUI libraries test failed
 )
 
-python -c "from googletrans import Translator; print('Translation library: OK')"
+python -c "from translate import Translator; print('Translation library: OK')"
 if %errorlevel% neq 0 (
     echo WARNING: Translation library test failed
 )
@@ -311,7 +311,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Test translation library
-python -c "from googletrans import Translator; print('Translation library: OK')" 2>/dev/null
+python -c "from translate import Translator; print('Translation library: OK')" 2>/dev/null
 if [ $? -ne 0 ]; then
     print_warning "Translation library test failed"
     echo "Check your internet connection"
@@ -510,7 +510,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Test translation library
-python -c "from googletrans import Translator; print('Translation library: OK')" 2>/dev/null
+python -c "from translate import Translator; print('Translation library: OK')" 2>/dev/null
 if [ $? -ne 0 ]; then
     print_warning "Translation library test failed"
     echo "Check your internet connection"

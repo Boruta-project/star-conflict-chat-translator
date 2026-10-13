@@ -28,7 +28,7 @@ This guide will walk you through everything you need to know to get started with
 
 ### What This Application Does
 
-- **🌍 Translates** in-game chat messages using Google Translate with fully customizable language support
+- **🌍 Translates** in-game chat messages using the free MyMemory translation service with fully customizable language support ([why not Google Translate?](translation-service.md#why-the-app-no-longer-uses-google-translate))
 - **⚡ Works in real-time** as messages appear
 - **🎨 Color-codes** different types of chat (Trading, Battle, Clan, etc.)
 - **📱 Integrates seamlessly** with your gaming experience
@@ -41,7 +41,7 @@ Before you begin, ensure your system meets these requirements:
 - ✅ **Operating System**: Windows 10+, Ubuntu 18.04+, or macOS 10.14+
 - ✅ **Python**: 3.8+ (if running from source)
 - ✅ **RAM**: At least 256 MB available
-- ✅ **Internet**: Stable connection for Google Translate
+- ✅ **Internet**: Stable connection for the translation service (MyMemory)
 - ✅ **Star Conflict**: Game installed and playable
 
 ## ⚙️ First-Time Setup
@@ -50,7 +50,7 @@ Before you begin, ensure your system meets these requirements:
 
 #### Option A: Pre-built Executable (Recommended)
 
-1. **Visit** the [Releases](https://sites.google.com/view/sc-chat-translator) page on Google Sites
+1. **Visit** the [Releases](https://github.com/jacek-mar/star-conflict-chat-translator/releases) page on GitHub
 2. **Download** the latest version for your operating system:
    - `SC_Chat_Translator_Windows.zip` for Windows
    - `SC_Chat_Translator_Linux.tar.gz` for Linux (currently unavailable)
@@ -65,7 +65,7 @@ Before you begin, ensure your system meets these requirements:
 
 ```bash
 # Download the source code
-git clone https://github.com/boruta-project/star-conflict-chat-translator.git
+git clone https://github.com/jacek-mar/star-conflict-chat-translator.git
 cd star-conflict-chat-translator
 
 # Create virtual environment
@@ -97,7 +97,9 @@ When you first run the application, you'll see:
 The application will automatically try to find your Star Conflict installation:
 
 **Default Search Paths:**
-- **Windows**: `C:\Users\[YourName]\Documents\My Games\StarConflict\logs`
+- **Windows**: `C:\Users\[YourName]\AppData\Local\Targem\StarConflict\logs`
+  (older game versions used `C:\Users\[YourName]\Documents\My Games\StarConflict\logs`;
+  if your settings still point there and the game has moved, the app switches automatically)
 - **Linux**: `~/Documents/My Games/StarConflict/logs`
 - **macOS**: `~/Documents/My Games/StarConflict/logs`
 
@@ -148,8 +150,8 @@ Configure languages, paths, and preferences
 
 **Status Messages:**
 - "Processing chat.log..." - Normal operation
-- "Translation error: [details]" - Google Translate issues
-- "Game logs not found" - Path configuration needed
+- "Waiting for chat.log – check the logs folder in Settings" - no chat log found; check the logs path
+- "Translation paused – free daily limit reached (until ~HH:MM)" - see *Translation Limits* below
 
 ## 🗨️ Chat Tab Guide
 
@@ -224,7 +226,7 @@ Output:
 - **Poor Quality**: Try rephrasing the original message
 - **Missing Context**: Add custom dictionary entries for game terms
 - **Connection Issues**: Check your internet connection
-- **Rate Limiting**: Google Translate has usage limits; wait a few minutes
+- **Daily Limit**: MyMemory has a free daily limit; see [Translation Service](translation-service.md)
 
 ## 📊 History Tab Guide
 
@@ -310,19 +312,23 @@ INFO: Retrying connection in 5 minutes
 1. Check your internet connection
 2. Verify firewall settings
 3. Try restarting the application
-4. Check if Google Translate is accessible in your region
+4. Check if https://api.mymemory.translated.net is accessible from your network
 
 #### Translation Errors
 
-```
-ERROR: Translation failed: HTTP 429
-WARNING: Rate limit exceeded, waiting...
-```
+Translation lines may show one of these short messages instead of a translation
+(the original message is always shown above it; details are in the App Log tab):
+
+| Message | Meaning |
+|---|---|
+| `[not translated – daily limit reached]` | The free MyMemory daily limit is used up. Translation pauses until it resets and then resumes on its own. |
+| `[not translated – translation service unreachable]` | No connection to MyMemory (internet or service down). |
+| `[not translated – message too long for the free service]` | MyMemory accepts about 500 characters per request. |
+| `[not translated – translation error, see App Log]` | Any other error. |
 
 **Solutions:**
-1. Reduce translation frequency
-2. Wait a few minutes for rate limits to reset
-3. Switch to a different translation service (future feature)
+1. Add your email in **Settings → Translation Service** to raise the daily limit 10×
+2. Wait for the limit to reset — the chat notice shows the approximate time
 
 #### File System Issues
 
@@ -375,6 +381,15 @@ WARNING: Game logs path not found
 
 **Use Case:** Different from chat translation for quick personal translations.
 
+#### Translation Limits and Email (Optional)
+
+Settings → **Translation Service (MyMemory)** → enter your email → **Save**
+(stored as `"mymemory_email"` in `settings.json`).
+
+Translation runs through MyMemory's free API, capped at 5,000 characters/day anonymously. Setting your own email raises your personal daily quota to 50,000 characters, at no cost and with no account required. **Use your own email, not one shared with other players** — the quota is tied to whatever email is set, so sharing one across installs pools everyone onto the same 50,000/day limit instead of each person getting their own.
+
+The Settings tab links to a plain-language explanation of why the email raises the limit and why the app no longer uses Google Translate: **[Translation Service](translation-service.md)**.
+
 ### Game Integration
 
 #### Automatic Path Detection
@@ -382,7 +397,8 @@ WARNING: Game logs path not found
 The application automatically searches for:
 
 ```
-Windows: %USERPROFILE%\Documents\My Games\StarConflict\logs
+Windows: %LOCALAPPDATA%\Targem\StarConflict\logs
+         (%USERPROFILE%\Documents\My Games\StarConflict\logs on older game versions)
 Linux: ~/Documents/My Games/StarConflict/logs
 macOS: ~/Documents/My Games/StarConflict/logs
 ```
@@ -474,11 +490,12 @@ python main.py --portable
 
 ### API Integration
 
-#### Google Translate API
+#### MyMemory Translation API (EXPERIMENTAL — see docs/design-translate-library-migration.md)
 
-- **Service**: googletrans Python library
-- **Rate Limits**: ~100 requests per hour
-- **Fallback**: Automatic retry with exponential backoff
+- **Service**: `translate` Python library (MyMemory backend), source language auto-detected
+- **Rate Limits**: 5,000 characters/day anonymous, 50,000/day with your own email (Settings → Translation Service); ~500 characters per individual request
+- **On failure**: the original message is shown with a short `[not translated – …]` note. When the daily limit is reached, the app stops sending requests until the limit resets (one notice in the chat, status bar shows the resume time)
+- **Saving requests**: repeated messages are answered from an in-memory cache, and messages with no letters at all (numbers, punctuation, emoji) are shown unchanged without a request. Every message is always displayed
 
 #### Custom Translation Services
 
@@ -653,7 +670,7 @@ While not currently implemented, planned features include:
 
 **Symptoms:**
 - Messages appear but translations are incorrect
-- Some messages show "[Translation error]"
+- Some messages show "[not translated – …]"
 
 **Solutions:**
 1. **Check Internet**: Verify stable internet connection
@@ -698,17 +715,16 @@ python main.py --debug
 
 ```python
 # Test translation service
-from googletrans import Translator
-translator = Translator()
-result = translator.translate("Hello world", dest="es")
-print(result.text)
+from translate import Translator
+result = Translator(to_lang="es").translate("Hello world")
+print(result)
 ```
 
 #### Network Diagnostics
 
 ```bash
-# Test Google Translate connectivity
-curl -s "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=es&dt=t&q=hello"
+# Test MyMemory connectivity
+curl -s "https://api.mymemory.translated.net/get?q=hello&langpair=en|es"
 ```
 
 ## ❓ FAQ
@@ -730,7 +746,7 @@ A: No, all translations happen locally. Chat logs are only stored on your comput
 ### Technical Questions
 
 **Q: Why does it need internet access?**
-A: Required for Google Translate API. No internet = no translations.
+A: Translation is done online by the MyMemory service. No internet = no translations (messages are still shown untranslated).
 
 **Q: Can I run multiple instances?**
 A: Not recommended. Each instance monitors the same log files.
@@ -739,7 +755,7 @@ A: Not recommended. Each instance monitors the same log files.
 A: No, it's completely passive. Only reads chat logs, never modifies game files.
 
 **Q: What's the translation delay?**
-A: Typically 1-3 seconds, depending on internet speed and Google Translate load.
+A: Typically 1-3 seconds, depending on internet speed and MyMemory's load.
 
 ### Language & Translation
 
@@ -753,7 +769,7 @@ A: The app supports 12 languages, set in the settings.json file. You can change 
 A: Game chat often uses abbreviations, slang, and mixed languages. Use the custom dictionary for game-specific terms.
 
 **Q: Can I change the translation service?**
-A: Currently only Google Translate. Alternative services may be added in future versions.
+A: Currently only MyMemory. Google Translate's free access is blocked (since September 2026), so it can't be used without a paid developer account; see [Translation Service](translation-service.md). Support for an official API with your own key may be added later.
 
 ### Performance & Compatibility
 

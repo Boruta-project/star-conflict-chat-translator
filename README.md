@@ -29,9 +29,13 @@
 
 ## ✨ Overview
 
-**Star Conflict Chat Translator** is a desktop application that provides **real-time multilingual chat translation** for the popular space combat game *Star Conflict*. Designed to enhance the gaming experience for international players, it automatically detects and translates in-game chat messages using Google Translate with **fully customizable language support** that you can configure through the settings, making communication seamless across language barriers.
+**Star Conflict Chat Translator** is a desktop application that provides **real-time multilingual chat translation** for the popular space combat game *Star Conflict*. Designed to enhance the gaming experience for international players, it automatically detects and translates in-game chat messages using the free **MyMemory** translation service with **fully customizable language support** that you can configure through the settings, making communication seamless across language barriers.
 
-The application monitors your game's chat logs in real-time, translates messages using Google Translate's advanced AI, and displays them with color-coded formatting. Whether you're coordinating with your squad in different languages or trading with international players, this tool ensures you never miss an important message again.
+The application monitors your game's chat logs in real-time, translates them, and displays them with color-coded formatting.
+
+> **Why MyMemory and not Google Translate?** Google blocked the free access the app relied on in September 2026. MyMemory works with no account or key and has a free daily limit, which you can raise 10× by entering your email in Settings. Details: **[Translation Service](docs/translation-service.md)**.
+
+Whether you're coordinating with your squad in different languages or trading with international players, this tool ensures you never miss an important message again.
 
 ### 🎯 Why Choose Star Conflict Chat Translator?
 
@@ -45,8 +49,8 @@ The application monitors your game's chat logs in real-time, translates messages
 ## 🎯 Key Features
 
 ### 🌍 **Multilingual Support**
-- **Customizable Language Support**: Configure your preferred languages through Google Translate settings 
-- **12 Default Languages Included**: Possibility to choose from 12 languages ​​supported by Google Translate, e.g. English, Spanish, French, German, Italian, Polish, Portuguese, Russian, Japanese, Chinese (Simplified), Arabic, Hindi
+- **Customizable Language Support**: Configure your preferred languages in `settings.json`
+- **12 Default Languages Included**: Possibility to choose from 12 languages, e.g. English, Spanish, French, German, Italian, Polish, Portuguese, Russian, Japanese, Chinese (Simplified), Arabic, Hindi
 - **Automatic Language Detection**: Smart detection of message languages
 - **Bidirectional Translation**: Translate to and from any configured language
 
@@ -75,7 +79,7 @@ The application monitors your game's chat logs in real-time, translates messages
 - **Community Game Dictionary**: Override translations for game-specific terms with community-maintained translations
 - **Local Chat Archive**: Private database storing all translated conversations locally
 - **Real-Time Chat Monitoring**: See all game chat tabs simultaneously, even during combat
-- **Built-in Translation Tool**: Integrated Google Translate without external tools
+- **Built-in Translation Tool**: Integrated translation without external tools
 - **Remote Updates**: Automatic dictionary and welcome message updates
 - **Export Functionality**: Save chat history to CSV for analysis
 - **Clipboard Integration**: One-click copying of translations
@@ -85,7 +89,7 @@ The application monitors your game's chat logs in real-time, translates messages
 
 ### For Users (Pre-built Executable)
 
-1. 1. **Download** the latest release from the [Download page](https://sites.google.com/view/sc-chat-translator) or from [Releases](../../releases)
+1. **Download** the latest release from [Releases](https://github.com/jacek-mar/star-conflict-chat-translator/releases)
 2. **Extract** the ZIP file to your preferred location
 3. **Run** `SC_Chat_Translator.exe` (Windows) or the appropriate executable for your platform
 4. **Configure** your preferred translation language in Settings
@@ -95,7 +99,7 @@ The application monitors your game's chat logs in real-time, translates messages
 
 ```bash
 # Clone the repository
-git clone https://github.com/boruta-project/star-conflict-chat-translator.git
+git clone https://github.com/jacek-mar/star-conflict-chat-translator.git
 cd star-conflict-chat-translator
 
 # Set up virtual environment
@@ -118,7 +122,7 @@ python main.py
 - **Python**: 3.8 or higher (for source installation)
 - **RAM**: 256 MB
 - **Storage**: 50 MB free space
-- **Internet**: Required for Google Translate API
+- **Internet**: Required for the translation service (MyMemory)
 
 ### Recommended Requirements
 - **Operating System**: Windows 10/11, Ubuntu 20.04+, or macOS 11+
@@ -136,7 +140,7 @@ python main.py
 
 ### Option 1: Pre-built Executable (Recommended for Users)
 
-1. Visit the [Releases](../../releases) or the [Download page](https://sites.google.com/view/sc-chat-translator)
+1. Visit [Releases](https://github.com/jacek-mar/star-conflict-chat-translator/releases)
 2. Download the latest version for your operating system
 3. Extract the archive to your desired location
 4. Run the executable file
@@ -147,7 +151,7 @@ python main.py
 #### Windows
 ```batch
 # Clone repository
-git clone https://github.com/boruta-project/star-conflict-chat-translator.git
+git clone https://github.com/jacek-mar/star-conflict-chat-translator.git
 cd star-conflict-chat-translator
 
 # Create virtual environment
@@ -164,7 +168,7 @@ python main.py
 #### Linux/macOS
 ```bash
 # Clone repository
-git clone https://github.com/boruta-project/star-conflict-chat-translator.git
+git clone https://github.com/jacek-mar/star-conflict-chat-translator.git
 cd star-conflict-chat-translator
 
 # Create virtual environment
@@ -219,7 +223,7 @@ The application features a clean, tabbed interface:
 #### 📋 **App Log Tab**
 - **Debug Information**: Monitor application performance
 - **Error Messages**: Troubleshoot issues
-- **Connection Status**: Verify Google Translate connectivity
+- **Connection Status**: Verify translation service connectivity
 
 #### ⚙️ **Settings Tab**
 - **Language Selection**: Choose your translation preferences
@@ -244,7 +248,7 @@ See **all chat tabs simultaneously**, even when the game interface doesn't show 
 - **Read-only access** - no interaction with game code
 
 #### Built-in Translation Tool
-**Integrated Google Translate** functionality:
+**Integrated translation** functionality:
 - **Translate any text** without opening additional tools
 - **Automatic clipboard copy** for easy pasting into game
 - **Works offline** once translations are cached
@@ -284,7 +288,7 @@ Translate any text instantly:
 The application automatically detects Star Conflict installations, but you can manually configure paths:
 
 **Default Locations:**
-- **Windows**: `%USERPROFILE%\Documents\My Games\StarConflict\logs`
+- **Windows**: `%LOCALAPPDATA%\Targem\StarConflict\logs` (older game versions: `%USERPROFILE%\Documents\My Games\StarConflict\logs` — the app switches automatically)
 - **Linux**: `~/Documents/My Games/StarConflict/logs`
 - **macOS**: `~/Documents/My Games/StarConflict/logs`
 
@@ -343,7 +347,7 @@ star-conflict-chat-translator/
 ```txt
 customtkinter>=5.2.0
 Pillow>=9.0.0
-googletrans>=4.0.0rc1
+translate>=3.8.1,<4.0.0
 pyperclip>=1.8.0
 ```
 
@@ -365,7 +369,7 @@ pyinstaller --windowed --icon=assets/logo.ico --add-data "assets:assets" main.py
 
 ### Community-Maintained Translations
 
-The `game_dictionary.json` file contains community-contributed translations for game-specific terms that improve translation accuracy beyond standard Google Translate. This dictionary includes:
+The `game_dictionary.json` file contains community-contributed translations for game-specific terms that improve translation accuracy beyond standard machine translation. This dictionary includes:
 
 - **Ship names and classes** (Tornado, Mammoth, Kusarigama)
 - **Weapon and equipment names** (Plasma Gun, Tai'thaq 17)
@@ -408,7 +412,7 @@ Help improve translations for all players:
 - ✅ **Test entries** - Ensure they improve in-game translations
 - ✅ **Community benefit** - Focus on commonly used terms
 
-**Current status**: 335+ community-contributed translations across ship names, weapons, and terminology.
+**Current status**: 343+ community-contributed translations across ship names, weapons, and terminology. In version 1.2.0 the app automatically persists remote dictionary entries to your local file on first sync.
 
 *Learn more: [Game Dictionary Guide](docs/game-dictionary.md)*
 
@@ -420,14 +424,14 @@ Help improve translations for all players:
 
 **Solution:**
 1. Manually set the logs path in Settings → "Browse"
-2. Default path: `Documents\My Games\StarConflict\logs`
+2. Default path: `%LOCALAPPDATA%\Targem\StarConflict\logs` (older game versions: `Documents\My Games\StarConflict\logs`)
 3. Ensure Star Conflict is installed and has been run at least once
 
 #### ❌ "Translation not working"
 
 **Solutions:**
 1. Check your internet connection
-2. Verify Google Translate accessibility (may be blocked in some regions)
+2. Check whether the free daily limit was reached (`[not translated – daily limit reached]`); see [Translation Service](docs/translation-service.md)
 3. Try switching to a different translation language
 4. Check the App Log tab for error messages
 
@@ -535,7 +539,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](../LICENS
 ### 🌟 Special Thanks
 
 - **Star Conflict Community**: For creating such an amazing international gaming experience
-- **Google Translate**: For providing the translation engine that makes this possible
+- **MyMemory (Translated)**: For the free translation service that makes this possible
 - **CustomTkinter**: For the beautiful modern GUI framework
 - **Open Source Community**: For the countless libraries and tools
 
@@ -553,7 +557,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](../LICENS
 - [Star Conflict Official Website](https://star-conflict.com/)
 - [Gaijin Entertainment](https://gaijin.net/)
 - [CustomTkinter Documentation](https://customtkinter.tomschimansky.com/)
-- [Googletrans Library](https://py-googletrans.readthedocs.io/)
+- [translate Library](https://github.com/terryyin/translate-python) (MyMemory backend — see `docs/design-translate-library-migration.md`)
 
 ---
 

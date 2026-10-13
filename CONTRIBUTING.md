@@ -33,7 +33,7 @@ Before you begin, ensure you have:
 ```bash
 # Fork the repository on GitHub
 # Clone your fork
-git clone https://github.com/boruta-project/star-conflict-chat-translator.git
+git clone https://github.com/jacek-mar/star-conflict-chat-translator.git
 cd star-conflict-chat-translator
 
 # Set up development environment

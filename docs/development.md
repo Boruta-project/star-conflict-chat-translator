@@ -47,10 +47,10 @@ python main.py
 
 ```bash
 # HTTPS (recommended for most users)
-git clone https://github.com/boruta-project/star-conflict-chat-translator.git
+git clone https://github.com/jacek-mar/star-conflict-chat-translator.git
 
 # SSH (if you have SSH keys set up)
-git clone git@github.com:boruta-project/star-conflict-chat-translator.git
+git clone git@github.com:jacek-mar/star-conflict-chat-translator.git
 
 # Change to project directory
 cd star-conflict-chat-translator
@@ -122,7 +122,7 @@ pip install tox
 
 ```bash
 # Test basic import
-python -c "import tkinter, customtkinter, googletrans; print('All imports successful!')"
+python -c "import tkinter, customtkinter, translate; print('All imports successful!')"
 
 # Test application startup
 python main.py --help
@@ -156,7 +156,7 @@ python main.py --help
 # requirements.txt
 customtkinter>=5.2.0        # Modern GUI framework
 Pillow>=9.0.0              # Image processing for icons
-googletrans>=4.0.0rc1      # Google Translate API wrapper
+translate>=3.8.1,<4.0.0     # MyMemory translation wrapper (EXPERIMENTAL — see docs/design-translate-library-migration.md)
 pyperclip>=1.8.0           # Clipboard operations
 ```
 
@@ -175,13 +175,12 @@ pre-commit>=2.0.0          # Git hooks
 
 #### From PyPI (Recommended)
 ```bash
-pip install customtkinter googletrans pyperclip Pillow
+pip install customtkinter translate pyperclip Pillow
 ```
 
 #### From GitHub (Latest Development)
 ```bash
 pip install git+https://github.com/TomSchimansky/CustomTkinter.git
-pip install git+https://github.com/ssut/py-googletrans.git
 ```
 
 #### Editable Installation
@@ -426,7 +425,7 @@ from pathlib import Path
 
 # Third-party imports
 import customtkinter as ctk
-from googletrans import Translator
+from translate import Translator
 from PIL import Image
 
 # Local imports
@@ -514,9 +513,8 @@ GOOGLE_TRANSLATE_URL = "https://translate.googleapis.com"
 ```python
 # Good: Specific exception types
 try:
-    result = translator.translate(text, dest=target_lang)
-    return result.text
-except googletrans.exceptions.TranslationError as e:
+    return Translator(to_lang=target_lang, from_lang="autodetect").translate(text)
+except translate.exceptions.TranslationError as e:
     logger.error(f"Translation failed: {e}")
     return f"[Translation error: {e}]"
 except requests.exceptions.RequestException as e:
@@ -899,8 +897,8 @@ export DISABLE_REMOTE_UPDATES=1
     "retry_count": 3
   },
   "remote": {
-    "welcome_url": "https://api.jsonsilo.com/public/...",
-    "dictionary_url": "https://api.jsonsilo.com/public/...",
+    "welcome_url": "https://raw.githubusercontent.com/jacek-mar/star-conflict-chat-translator/main/remote/welcome.json",
+    "dictionary_url": "https://raw.githubusercontent.com/jacek-mar/star-conflict-chat-translator/main/game_dictionary.json",
     "fetch_interval": 3600,
     "timeout": 5
   },
