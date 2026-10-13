@@ -1,0 +1,22 @@
+# Exact versions the app is tested and released with (CI, release builds).
+# requirements.txt keeps the allowed ranges; this file pins one tested set.
+#
+# To update: create a fresh venv with the release Python (3.12), then
+#   pip install -r requirements.txt
+#   pip freeze > requirements-lock.txt   (and restore this header)
+# and let CI run. The weekly "Dependency check" workflow tests the newest versions
+# allowed by requirements.txt and fails early if a new release breaks the app.
+certifi==2026.7.22
+charset-normalizer==3.5.2
+click==8.5.0
+customtkinter==6.0.0
+darkdetect==0.8.0
+idna==3.20
+libretranslatepy==2.1.1
+lxml==6.1.3
+packaging==26.3
+pillow==12.3.0
+pyperclip==1.11.0
+requests==2.34.2
+translate==3.8.1
+urllib3==2.8.0

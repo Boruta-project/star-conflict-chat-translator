@@ -23,7 +23,7 @@
 ### Prerequisites
 
 Before you begin, ensure you have:
-- ✅ Python 3.8+ installed
+- ✅ Python 3.10+ installed
 - ✅ Git for version control
 - ✅ A GitHub account
 - ✅ Basic knowledge of Python and GUI development

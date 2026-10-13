@@ -26,19 +26,19 @@
 
 ```bash
 # Clone and setup in one command
-git clone https://github.com/yourusername/star-conflict-chat-translator.git
+git clone https://github.com/jacek-mar/star-conflict-chat-translator.git
 cd star-conflict-chat-translator
 python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -r requirements-lock.txt -r requirements-dev.txt
 python main.py
 ```
 
 ### Prerequisites Checklist
 
-- ✅ **Python 3.8+** installed
+- ✅ **Python 3.10+** installed
 - ✅ **Git** for version control
 - ✅ **Code Editor** (VS Code, PyCharm, etc.)
-- ✅ **Internet connection** for dependencies and Google Translate
+- ✅ **Internet connection** for dependencies and the translation service (MyMemory)
 - ✅ **Star Conflict** game installed (for testing)
 
 ## 💻 Development Environment Setup
@@ -96,27 +96,25 @@ conda install pip
 
 ### 3. Install Dependencies
 
-#### Basic Dependencies
 ```bash
-# Install core requirements
-pip install -r requirements.txt
-```
+# Runtime libraries, exact versions tested by CI
+pip install -r requirements-lock.txt
 
-#### Development Dependencies
-```bash
-# Install development tools
+# Test and lint tools (same versions as CI)
 pip install -r requirements-dev.txt
+
+# Only for building the Windows exe
+pip install -r requirements-build.txt
 ```
 
-#### Optional Dependencies
-```bash
-# For building executables
-pip install pyinstaller
+| File | Contents |
+|---|---|
+| `requirements.txt` | Allowed version **ranges** of the runtime libraries (used by `pip install .`) |
+| `requirements-lock.txt` | One **exact, tested** set of those libraries; used by CI, the release build and the install scripts |
+| `requirements-dev.txt` | pytest, pytest-cov, pytest-mock, flake8 (pinned) |
+| `requirements-build.txt` | PyInstaller (pinned) |
 
-# For advanced testing
-pip install pytest-cov
-pip install tox
-```
+To update libraries: in a fresh venv with Python 3.12 run `pip install -r requirements.txt`, then `pip freeze` into `requirements-lock.txt` (keep its header), run the tests, commit. The weekly *Dependency check* workflow warns when a new library release breaks the app.
 
 ### 4. Verify Installation
 
@@ -162,14 +160,7 @@ pyperclip>=1.8.0           # Clipboard operations
 
 ### Development Dependencies
 
-```txt
-# requirements-dev.txt
-pytest>=7.0.0              # Testing framework
-black>=22.0.0              # Code formatting
-flake8>=4.0.0              # Linting
-mypy>=0.900                # Type checking
-pre-commit>=2.0.0          # Git hooks
-```
+See `requirements-dev.txt` (pytest, pytest-cov, pytest-mock, flake8 — pinned to the versions CI uses).
 
 ### Installing from Different Sources
 
@@ -195,8 +186,10 @@ pip install -e .
 star-conflict-chat-translator/
 ├── main.py                          # Main application entry point
 ├── game_dictionary.json             # Community-maintained game terms dictionary
-├── requirements.txt                 # Core dependencies
-├── requirements-dev.txt            # Development dependencies
+├── requirements.txt                 # Runtime dependencies (allowed ranges)
+├── requirements-lock.txt           # Runtime dependencies (exact tested versions)
+├── requirements-dev.txt            # Test and lint tools
+├── requirements-build.txt          # PyInstaller
 ├── pyproject.toml                  # Modern Python project configuration
 ├── MANIFEST.in                     # Package manifest for distribution
 ├── .gitignore                      # Git ignore rules
@@ -210,8 +203,11 @@ star-conflict-chat-translator/
 │   ├── installation.md             # Installation instructions
 │   ├── troubleshooting.md          # Troubleshooting guide
 │   └── development.md              # Development documentation
-├── scripts/                        # Build and installation scripts
-│   ├── build.py                    # Build automation script
+├── packaging/                      # PyInstaller spec (Windows exe)
+├── scripts/                        # Build, release and installation scripts
+│   ├── build_exe.py                # Build + smoke-test the Windows exe
+│   ├── release_tools.py            # Version check and release notes
+│   ├── run_sandbox.py              # Run the app with a test profile
 │   ├── install_windows.bat         # Windows installer
 │   ├── install_linux.sh            # Linux installer
 │   └── install_macos.sh            # macOS installer
@@ -626,97 +622,30 @@ def log_memory_usage():
 
 ## 📦 Building & Distribution
 
-### Building Executables
+### Continuous integration
 
-#### Windows Executable
-```batch
-# Install PyInstaller
-pip install pyinstaller
+GitHub Actions workflows (`.github/workflows/`):
 
-# Create single executable
-pyinstaller --onefile --windowed --icon=assets/logo.ico main.py
+| Workflow | When | What |
+|---|---|---|
+| **Tests and build** (`tests.yml`) | every push to `main` and every pull request | tests on Windows and Ubuntu with Python 3.10–3.14 (pinned libraries), then builds and smoke-tests the Windows exe; the exe is kept as a downloadable artifact for 14 days |
+| **Release** (`release.yml`) | a pushed `v*` tag | checks the version numbers, runs the tests, builds the exe and creates a **draft** GitHub release |
+| **Dependency check** (`dependency-check.yml`) | Mondays, or manually | tests with the newest library versions allowed by `requirements.txt` — an early warning before a library update breaks a release |
 
-# Create directory-based executable
-pyinstaller --onedir --windowed --icon=assets/logo.ico main.py
-```
+### Building the Windows exe
 
-#### Linux/macOS Executables
 ```bash
-# Install PyInstaller
-pip install pyinstaller
-
-# Create executable
-pyinstaller --onefile --windowed --icon=assets/logo.ico main.py
+pip install -r requirements-lock.txt -r requirements-build.txt
+python scripts/build_exe.py
 ```
 
-#### Advanced PyInstaller Configuration
-```python
-# pyinstaller.spec
-a = Analysis(['main.py'],
-             pathex=['.'],
-             binaries=[],
-             datas=[('assets', 'assets')],
-             hiddenimports=[],
-             hookspath=[],
-             runtime_hooks=[],
-             excludes=[],
-             win_no_prefer_redirects=False,
-             win_private_assemblies=False,
-             cipher=None)
+Details, including why the exe is smoke-tested without Python on `PATH`: [building-executables.md](building-executables.md).
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+### Releasing
 
-exe = EXE(pyz,
-          a.scripts,
-          a.binaries,
-          a.zipfiles,
-          a.datas,
-          name='SC_Chat_Translator',
-          debug=False,
-          strip=False,
-          upx=True,
-          runtime_tmpdir=None,
-          console=False,
-          icon='assets/logo.ico')
-```
+Step-by-step: [releasing.md](releasing.md).
 
-### Creating Installers
-
-#### Windows Installer (NSIS)
-```bash
-# Install NSIS
-# Create installer script
-# Build installer
-makensis installer.nsi
-```
-
-#### Linux Packages
-```bash
-# Create .deb package
-dpkg-deb --build star-conflict-translator_1.0.0
-
-# Create .rpm package
-rpmbuild -ba star-conflict-translator.spec
-```
-
-#### macOS Application Bundle
-```bash
-# Use PyInstaller with --onedir
-pyinstaller --onedir --windowed main.py
-
-# Create .dmg file
-hdiutil create -volname "SC Chat Translator" -srcfolder dist/main -ov -format UDZO SC_Chat_Translator.dmg
-```
-
-### Distribution Checklist
-
-- ✅ **Test executable** on clean system
-- ✅ **Verify dependencies** are included
-- ✅ **Check file paths** work correctly
-- ✅ **Test translations** work
-- ✅ **Verify settings** save/load correctly
-- ✅ **Check for errors** in logs
-- ✅ **Test uninstall** (if applicable)
+Only the Windows exe is built. On Linux and macOS the app runs from source (tests run on Ubuntu in CI).
 
 ## 🤝 Contributing Guidelines
 

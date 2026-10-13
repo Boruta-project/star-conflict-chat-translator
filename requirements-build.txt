@@ -1,19 +1,4 @@
-# Build-time dependencies for Star Conflict Chat Translator
-
-# Build tools
-pyinstaller>=5.0.0
-setuptools>=65.0.0
-wheel>=0.37.0
-
-# Testing (already in requirements-dev.txt but included for completeness)
-pytest>=7.0.0
-pytest-cov>=4.0.0
-
-# Code quality (optional for builds)
-black>=23.0.0
-isort>=5.12.0
-mypy>=1.0.0
-flake8>=6.0.0
-
-# Development tools
-pre-commit>=3.0.0
+# Tools for building the Windows exe (scripts/build_exe.py). Pinned so every build
+# uses the same PyInstaller. Install together with requirements-lock.txt.
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8

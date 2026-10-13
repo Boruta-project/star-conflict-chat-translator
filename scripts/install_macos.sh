@@ -27,7 +27,7 @@ print_error() {
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
     print_error "Python 3 is not installed"
-    echo "Please install Python 3.8+ from https://python.org"
+    echo "Please install Python 3.10+ from https://python.org"
     echo "Or using Homebrew: brew install python"
     exit 1
 fi
@@ -40,8 +40,8 @@ echo "Python version: $PYTHON_VERSION"
 PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
 
-if [ "$PYTHON_MAJOR" -lt 3 ] || [ "$PYTHON_MAJOR" -eq 3 -a "$PYTHON_MINOR" -lt 8 ]; then
-    print_error "Python 3.8+ is required. Current version: $PYTHON_VERSION"
+if [ "$PYTHON_MAJOR" -lt 3 ] || [ "$PYTHON_MAJOR" -eq 3 -a "$PYTHON_MINOR" -lt 10 ]; then
+    print_error "Python 3.10+ is required. Current version: $PYTHON_VERSION"
     exit 1
 fi
 
@@ -85,7 +85,7 @@ python -m pip install --upgrade pip
 
 # Install dependencies
 print_status "Installing dependencies..."
-pip install -r requirements.txt
+pip install -r requirements-lock.txt
 if [ $? -ne 0 ]; then
     print_error "Failed to install dependencies"
     echo "Please check your internet connection and try again"

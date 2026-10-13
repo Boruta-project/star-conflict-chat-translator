@@ -16,8 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Translation Service: the status line under the email field only takes up space while it shows a message.
 
 ### Developer notes
-- Removed the unused `src/sc_translator/` copy of `main.py`.
-- The release workflow runs only manually for now; see the comment in `.github/workflows/release.yml`.
+- **Build and CI rebuilt.** One PyInstaller spec (`packaging/`) and one build script (`scripts/build_exe.py`) used both locally and in CI; every build is smoke-tested without Python on `PATH`. Runtime libraries are pinned in `requirements-lock.txt`; a weekly workflow tests the newest allowed versions. Tag pushes create a draft release after a version check and the full test matrix. See [docs/releasing.md](docs/releasing.md).
+- Supported Python versions for running from source: 3.10–3.14 (3.8/3.9 are no longer supported by the libraries the app uses).
+- The exe accepts `--smoke-test [report-file]` to check a build without starting the app.
+- Removed the old build scripts (`build/`, `scripts/build.py`) and the unused `src/sc_translator/` copy of `main.py`.
 
 ## [1.4.0] - 2026-10-13
 

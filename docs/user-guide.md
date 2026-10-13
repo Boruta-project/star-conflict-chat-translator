@@ -39,7 +39,7 @@ This guide will walk you through everything you need to know to get started with
 Before you begin, ensure your system meets these requirements:
 
 - ✅ **Operating System**: Windows 10+, Ubuntu 18.04+, or macOS 10.14+
-- ✅ **Python**: 3.8+ (if running from source)
+- ✅ **Python**: 3.10+ (if running from source)
 - ✅ **RAM**: At least 256 MB available
 - ✅ **Internet**: Stable connection for the translation service (MyMemory)
 - ✅ **Star Conflict**: Game installed and playable
@@ -686,7 +686,7 @@ While not currently implemented, planned features include:
 
 **Solutions:**
 1. **Dependencies**: Run `pip install -r requirements.txt`
-2. **Python Version**: Ensure Python 3.8+ is installed
+2. **Python Version**: Ensure Python 3.10+ is installed
 3. **Virtual Environment**: Activate venv before running
 4. **Missing Files**: Verify all files from repository are present
 

@@ -3,6 +3,7 @@ include LICENSE
 include CONTRIBUTING.md
 include CHANGELOG.md
 include requirements.txt
+include requirements-lock.txt
 include pyproject.toml
 include .gitignore
 

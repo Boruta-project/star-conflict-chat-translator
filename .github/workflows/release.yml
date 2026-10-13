@@ -1,89 +1,86 @@
-name: Create Release
+# Builds a release when a version tag (v1.2.3) is pushed.
+#
+# 1. Checks that the tag, APP_VERSION in main.py, pyproject.toml and CHANGELOG.md agree.
+# 2. Runs the full test matrix and builds + smoke-tests the Windows exe (tests.yml).
+# 3. Creates a DRAFT GitHub release with the exe, SHA256SUMS.txt and the CHANGELOG
+#    section as notes. A maintainer reviews the draft and clicks "Publish release".
+#
+# How to release: docs/releasing.md
+name: Release
 
-# Manual only. The automatic run on 'v*' tags was disabled because build/build.py
-# still builds as version 1.1.3 and the job does not install requirements.txt, so it
-# published broken executables. Until that is fixed, releases are built locally
-# (docs/building-executables.md) and uploaded by hand.
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Release version'
+      tag:
+        description: "Existing tag to build a draft release for (e.g. v1.4.1)"
         required: true
-        default: 'v1.1.3'
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        include:
-        - os: windows-latest
-          target: windows
-        - os: ubuntu-latest
-          target: linux
-        - os: macos-latest
-          target: macos
-
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
-    - uses: actions/checkout@v4
+      - id: tag
+        shell: bash
+        run: echo "tag=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/release_tools.py check-version "${{ steps.tag.outputs.tag }}"
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-
-    - name: Install build dependencies
-      run: pip install -r requirements-build.txt
-
-    - name: Build executable
-      run: python build/build.py --target ${{ matrix.target }}
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: executables-${{ matrix.target }}
-        path: dist/
+  tests:
+    needs: check-version
+    uses: ./.github/workflows/tests.yml
 
   release:
-    needs: build
-    runs-on: ubuntu-latest
-
+    needs: [check-version, tests]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.check-version.outputs.tag }}
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ./artifacts
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
 
-    - name: Create source archive
-      run: |
-        python build/build.py --release
-        cp dist/*.zip ./artifacts/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements-lock.txt
+            requirements-build.txt
 
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ github.ref_name }}
-        name: "Star Conflict Chat Translator ${{ github.ref_name }}"
-        body: |
-          ## Changes in this release
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-lock.txt -r requirements-build.txt
 
-          ### Downloads
-          - **Windows**: Download `SC_Chat_Translator_${{ github.ref_name }}_Windows.exe`
-          - **Linux**: Download `SC_Chat_Translator_${{ github.ref_name }}_Linux`
-          - **macOS**: Download `SC_Chat_Translator_${{ github.ref_name }}_macOS.app`
-          - **Source Code**: Download source archive
+      - name: Build and smoke-test the exe
+        run: python scripts/build_exe.py
 
-          ### Installation
-          1. Download the appropriate executable for your platform
-          2. Run the installer or extract the archive
-          3. Launch the application
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: python scripts/release_tools.py notes "${TAG#v}" dist/release-notes.md
 
-          ### System Requirements
-          - Windows 10+, Ubuntu 18.04+, or macOS 10.14+
-          - 256 MB RAM minimum
-          - Internet connection for translations
-        files: ./artifacts/**/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: SC Chat Translator ${{ env.TAG }}
+          body_path: dist/release-notes.md
+          draft: true
+          files: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true

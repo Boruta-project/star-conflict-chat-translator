@@ -22,7 +22,7 @@
 ### Step 1: Check System Requirements
 
 **Minimum Requirements:**
-- ✅ Python 3.8+ installed
+- ✅ Python 3.10+ installed
 - ✅ 256 MB RAM available
 - ✅ Internet connection
 - ✅ Star Conflict game installed
@@ -30,7 +30,7 @@
 **Check Python Version:**
 ```bash
 python --version
-# Should show: Python 3.8.x or higher
+# Should show: Python 3.10.x or higher
 ```
 
 **Check Available Memory:**

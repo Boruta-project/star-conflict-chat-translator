@@ -1,0 +1,34 @@
+# Early warning for library updates. Installs the NEWEST versions that requirements.txt
+# allows (not the pinned lock file) and runs the tests. If this fails, a new release of
+# a dependency broke something: fix the code or narrow the range in requirements.txt
+# before updating requirements-lock.txt. Released exes are not affected (they use the lock).
+name: Dependency check
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  latest-dependencies:
+    name: Latest dependencies (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install newest allowed versions
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade -r requirements.txt -r requirements-dev.txt
+          pip freeze
+      - name: Run tests
+        run: pytest --no-cov -q

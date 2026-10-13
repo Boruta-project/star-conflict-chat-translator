@@ -55,7 +55,7 @@ REM Check if Python is installed
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERROR: Python is not installed or not in PATH
-    echo Please install Python 3.8+ from https://python.org
+    echo Please install Python 3.10+ from https://python.org
     echo Make sure to check "Add Python to PATH" during installation
     pause
     exit /b 1
@@ -216,7 +216,7 @@ print_error() {
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
     print_error "Python 3 is not installed"
-    echo "Please install Python 3.8+ using your package manager:"
+    echo "Please install Python 3.10+ using your package manager:"
     echo "  Ubuntu/Debian: sudo apt install python3 python3-pip python3-venv"
     echo "  CentOS/RHEL: sudo yum install python3 python3-pip"
     echo "  Fedora: sudo dnf install python3 python3-pip"
@@ -231,8 +231,8 @@ echo "Python version: $PYTHON_VERSION"
 PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
 
-if [ "$PYTHON_MAJOR" -lt 3 ] || [ "$PYTHON_MAJOR" -eq 3 -a "$PYTHON_MINOR" -lt 8 ]; then
-    print_error "Python 3.8+ is required. Current version: $PYTHON_VERSION"
+if [ "$PYTHON_MAJOR" -lt 3 ] || [ "$PYTHON_MAJOR" -eq 3 -a "$PYTHON_MINOR" -lt 10 ]; then
+    print_error "Python 3.10+ is required. Current version: $PYTHON_VERSION"
     exit 1
 fi
 
@@ -379,7 +379,7 @@ print_error() {
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
     print_error "Python 3 is not installed"
-    echo "Please install Python 3.8+ from https://python.org"
+    echo "Please install Python 3.10+ from https://python.org"
     echo "Or using Homebrew: brew install python"
     exit 1
 fi
@@ -392,8 +392,8 @@ echo "Python version: $PYTHON_VERSION"
 PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
 
-if [ "$PYTHON_MAJOR" -lt 3 ] || [ "$PYTHON_MAJOR" -eq 3 -a "$PYTHON_MINOR" -lt 8 ]; then
-    print_error "Python 3.8+ is required. Current version: $PYTHON_VERSION"
+if [ "$PYTHON_MAJOR" -lt 3 ] || [ "$PYTHON_MAJOR" -eq 3 -a "$PYTHON_MINOR" -lt 10 ]; then
+    print_error "Python 3.10+ is required. Current version: $PYTHON_VERSION"
     exit 1
 fi
 
@@ -548,7 +548,7 @@ echo
 
 ### All Scripts Include:
 
-- ✅ **Python version checking** (requires 3.8+)
+- ✅ **Python version checking** (requires 3.10+)
 - ✅ **Virtual environment creation** and activation
 - ✅ **Dependency installation** from requirements.txt
 - ✅ **Desktop/Application shortcuts** creation

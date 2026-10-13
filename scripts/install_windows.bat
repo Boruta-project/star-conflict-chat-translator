@@ -11,7 +11,7 @@ REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python is not installed or not in PATH
-    echo Please install Python 3.8+ from https://python.org
+    echo Please install Python 3.10+ from https://python.org
     pause
     exit /b 1
 )
@@ -51,7 +51,7 @@ if errorlevel 1 (
 REM Install requirements
 echo.
 echo Installing dependencies...
-pip install -r requirements.txt
+pip install -r requirements-lock.txt
 if errorlevel 1 (
     echo ERROR: Failed to install requirements
     pause

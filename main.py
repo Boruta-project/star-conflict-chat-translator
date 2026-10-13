@@ -2553,8 +2553,48 @@ def resource_path(rel_path: str) -> str:
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base, rel_path)
 
+SMOKE_TEST_FILES = ("assets/logo.ico", "assets/help_blue.png", "game_dictionary.json")
+
+
+def smoke_test():
+    """Check that this build can start, without opening the app or using the network.
+
+    Used by scripts/build_exe.py on the packaged exe: verifies the bundled files, that
+    the third-party libraries import, and that Tk can create a window. Returns a list
+    of problems (empty = OK).
+    """
+    problems = []
+    for rel in SMOKE_TEST_FILES:
+        if not os.path.isfile(resource_path(rel)):
+            problems.append(f"missing bundled file: {rel}")
+    try:
+        with open(resource_path("game_dictionary.json"), encoding="utf-8") as f:
+            json.load(f)
+        Image.open(resource_path("assets/help_blue.png")).load()
+        MyMemoryTranslator(to_lang="en", from_lang=_MYMEMORY_AUTODETECT)
+        root = ctk.CTk()
+        root.withdraw()
+        ctk.CTkLabel(root, text="ok", font=ctk.CTkFont(size=11)).pack()
+        root.update()
+        root.destroy()
+    except Exception as e:
+        problems.append(f"{type(e).__name__}: {e}")
+    return problems
+
+
 def main():
     """Entry point for the `sc-chat-translator` console script (see pyproject.toml)."""
+    if "--smoke-test" in sys.argv:
+        # A windowed exe has no console, so the result goes to a file when one is given.
+        problems = smoke_test()
+        report = f"SC Chat Translator {APP_VERSION}: " + ("; ".join(problems) or "OK")
+        idx = sys.argv.index("--smoke-test")
+        if idx + 1 < len(sys.argv):
+            with open(sys.argv[idx + 1], "w", encoding="utf-8") as f:
+                f.write(report + "\n")
+        else:
+            print(report)
+        sys.exit(1 if problems else 0)
     app = TranslatedFileWatcher()
     app.mainloop()
 

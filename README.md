@@ -2,7 +2,7 @@
 <div align="center">
   <h1>🌍 Real-time Multilingual Chat Translation for Star Conflict</h1>
 
-  <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python Version">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg" alt="Platform Support">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/Status-Active-success.svg" alt="Status">
@@ -119,7 +119,7 @@ python main.py
 
 ### Minimum Requirements
 - **Operating System**: Windows 10, Ubuntu 18.04+, or macOS 10.14+
-- **Python**: 3.8 or higher (for source installation)
+- **Python**: 3.10 or higher (for source installation)
 - **RAM**: 256 MB
 - **Storage**: 50 MB free space
 - **Internet**: Required for the translation service (MyMemory)
@@ -321,8 +321,11 @@ star-conflict-chat-translator/
 │   ├── troubleshooting.md # Troubleshooting guide
 │   ├── development.md     # Development documentation
 │   └── ...                # Other documentation
-├── scripts/               # Build and installation scripts
-│   ├── build.py           # Build automation script
+├── packaging/             # PyInstaller spec (Windows exe)
+├── scripts/               # Build, release and installation scripts
+│   ├── build_exe.py       # Build + smoke-test the Windows exe
+│   ├── release_tools.py   # Version check and release notes
+│   ├── run_sandbox.py     # Run the app with a test profile
 │   ├── install_windows.bat # Windows installer
 │   ├── install_linux.sh   # Linux installer
 │   └── install_macos.sh   # macOS installer
@@ -442,7 +445,7 @@ Help improve translations for all players:
 #### ❌ "Application won't start"
 
 **Solutions:**
-1. Ensure Python 3.8+ is installed
+1. Ensure Python 3.10+ is installed
 2. Try running from command line: `python main.py`
 3. Check for missing dependencies: `pip install -r requirements.txt`
 4. Verify all required files are present
