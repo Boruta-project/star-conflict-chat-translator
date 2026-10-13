@@ -552,7 +552,9 @@ class TranslatedFileWatcher(ctk.CTk):
         dark_image=Image.open(resource_path("assets/help_blue.png")),   # same image for both themes
         size=(16, 16)
         )
-        self.iconbitmap(resource_path("assets/logo.ico"))
+        # .ico window icons only exist on Windows; Tk on Linux/macOS raises TclError
+        if sys.platform == "win32":
+            self.iconbitmap(resource_path("assets/logo.ico"))
 
         # --- Settings & Dictionary load/create ---
         self.settings_path = self._get_settings_path()
