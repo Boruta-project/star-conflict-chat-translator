@@ -882,15 +882,16 @@ class TranslatedFileWatcher(ctk.CTk):
             command=self._clear_mymemory_email
         ).pack(side="left")
 
+        # Packed only while it has text (see _set_email_status), so it leaves no gap
         self.mymemory_email_status = ctk.CTkLabel(grp_service, text="", text_color="gray", font=_fnt_hint)
-        self.mymemory_email_status.pack(anchor="w", padx=7)
 
-        ctk.CTkLabel(
+        self._email_hint_label = ctk.CTkLabel(
             grp_service,
             text="Optional: raises the free daily limit from 5,000 to 50,000 characters.\n"
                  "Use your own address — it is stored only in settings.json and sent only to MyMemory.",
             font=_fnt_hint, text_color="gray", justify="left"
-        ).pack(anchor="w", padx=7, pady=(0, 1))
+        )
+        self._email_hint_label.pack(anchor="w", padx=7, pady=(0, 1))
 
         service_info_link = ctk.CTkLabel(
             grp_service,
@@ -1489,25 +1490,30 @@ copies or substantial portions of the Software."""
         except Exception:
             pass
 
+    def _set_email_status(self, text):
+        self.mymemory_email_status.configure(text=text)
+        if not self.mymemory_email_status.winfo_manager():
+            self.mymemory_email_status.pack(anchor="w", padx=7, before=self._email_hint_label)
+
     def _save_mymemory_email(self):
         email = self.mymemory_email_var.get().strip()
         if not email:
             self._clear_mymemory_email()
             return
         if not _is_valid_email(email):
-            self.mymemory_email_status.configure(text="That doesn't look like an email address — not saved.")
+            self._set_email_status("That doesn't look like an email address — not saved.")
             return
         self.settings["mymemory_email"] = email
         self._save_settings()
         self.translation_service.resume()  # the higher quota applies immediately
-        self.mymemory_email_status.configure(text="Saved. Higher daily limit is active.")
+        self._set_email_status("Saved. Higher daily limit is active.")
         self.logger.info("MyMemory email saved (higher daily limit)")  # never log the address
 
     def _clear_mymemory_email(self):
         self.mymemory_email_var.set("")
         self.settings["mymemory_email"] = ""
         self._save_settings()
-        self.mymemory_email_status.configure(text="Cleared. Using the anonymous daily limit.")
+        self._set_email_status("Cleared. Using the anonymous daily limit.")
         self.logger.info("MyMemory email cleared")
 
     def _manual_translate(self):

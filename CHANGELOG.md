@@ -10,6 +10,15 @@ All notable changes to **Star Conflict Chat Translator** will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Settings → Translation Service: the status line under the email field only takes up space while it shows a message.
+
+### Developer notes
+- Removed the unused `src/sc_translator/` copy of `main.py`.
+- The release workflow runs only manually for now; see the comment in `.github/workflows/release.yml`.
+
 ## [1.4.0] - 2026-10-13
 
 ### Fixed
