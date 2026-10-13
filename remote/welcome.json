@@ -1,18 +1,16 @@
 {
-    "id": "004",
+    "id": "005",
     "color": "DodgerBlue",
-    "version": "1.4.0",
-    "download_url": "https://github.com/jacek-mar/star-conflict-chat-translator/releases",
-    "notes": "This is a free app released under the MIT license. The project now lives at github.com/jacek-mar/star-conflict-chat-translator.",
+    "version": "1.4.1",
+    "download_url": "https://github.com/jacek-mar/star-conflict-chat-translator/releases/latest",
+    "notes": "This is a free app released under the MIT license. Website: jacek-mar.github.io/star-conflict-chat-translator",
     "whats_new": {
         "changes": [
-            "Supports the new Star Conflict log folder (AppData\\Local\\Targem\\StarConflict) and switches to it automatically",
-            "Clear, short messages when a translation fails, instead of technical errors",
-            "Translation pauses when the free daily limit is reached and resumes on its own",
-            "Optional email in Settings raises the free daily limit from 5,000 to 50,000 characters",
-            "Repeated messages are translated once and reused",
-            "Project, user manual and downloads moved to GitHub"
+            "Choose which chat channels are translated (Settings → Translated Channels); all are on by default",
+            "Unticked channels are still shown, just not translated — saves the free daily limit",
+            "New project website with the user guide: jacek-mar.github.io/star-conflict-chat-translator",
+            "Fixed a startup crash on Linux and macOS"
         ]
     },
-    "welcome_message": "This app helps translate and manage in-game chat messages.\nIt was created to improve the game experience for players from different countries.\nIt is still in development and may contain some minor bugs. Released under the MIT license.\nThe application uses a free translation service (MyMemory) and does not interfere with the game code.\nCheck your preferences in the Settings tab.\nFeel free to share your feedback about this program with me.\nNew in version 1.4.0:\n- support for the new Star Conflict log folder,\n- clear messages and an automatic pause when the free daily translation limit is reached,\n- optional email in Settings for a 10x higher daily limit,\n- project, user manual and downloads moved to GitHub.\n"
+    "welcome_message": "This app helps translate and manage in-game chat messages.\nIt was created to improve the game experience for players from different countries.\nIt is still in development and may contain some minor bugs. Released under the MIT license.\nThe application uses a free translation service (MyMemory) and does not interfere with the game code.\nCheck your preferences in the Settings tab.\nFeel free to share your feedback about this program with me.\nNew in version 1.4.1:\n- choose which chat channels are translated (Settings → Translated Channels),\n- new project website: jacek-mar.github.io/star-conflict-chat-translator\n"
 }
