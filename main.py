@@ -7,7 +7,8 @@ from PIL import Image
 import json
 import logging
 from logging.handlers import RotatingFileHandler
-from googletrans import Translator
+from translate import Translator as MyMemoryTranslator
+from translate.exceptions import TranslationError
 from pathlib import Path
 from tkinter import filedialog
 from datetime import datetime
@@ -16,7 +17,9 @@ import sqlite3
 import csv
 import pyperclip  # copy translated user entry to clipboard
 import webbrowser  # for opening links
-import asyncio
+import requests  # used by `translate`; needed here to recognise network errors
+from collections import OrderedDict
+from typing import NamedTuple
 
 # --- Libraries for HTTP fetch ---
 from urllib.request import urlopen, Request
@@ -26,15 +29,20 @@ from urllib.error import URLError, HTTPError
 # Global configuration
 # -----------------------
 
-APP_VERSION = "1.1.3"
+APP_VERSION = "1.4.0"
 APP_AUTHOR = "Hystrix"
 AUTHOR_EMAIL = "borutaproject@gmail.com"
 
 # Default application window geometry
-DEFAULT_WINDOW_WIDTH = 640
-DEFAULT_WINDOW_HEIGHT = 670
+DEFAULT_WINDOW_WIDTH = 480
+DEFAULT_WINDOW_HEIGHT = 536
 
-BUTTON_HEIGHT = 22
+BUTTON_HEIGHT = 20
+
+# App-wide font sizes — help section uses its own (not reduced)
+APP_FONT_SIZE = 11        # body: labels, entries, buttons
+APP_FONT_SIZE_SMALL = 9   # hints and captions
+APP_FONT_SIZE_GROUP = 12  # settings group headings (regular weight, as in 1.1.3)
 
 # Help window dimensions (relative to main window)
 HELP_WINDOW_WIDTH_RATIO = 0.8  # 80% of main window width
@@ -48,23 +56,54 @@ HELP_BUTTON_RATIO = 0.1   # 10% for help button
 LINK_COLOR = "#4A90E2"  # Blue for clickable links
 LINK_CURSOR = "hand2"   # Hand cursor for links
 
-# Help content styling
-HELP_SECTION_SPACING = 10  # Spacing between sections eg 15
-HELP_CONTENT_PADDING = 15  # Padding for content areas eg 20
+# Help content styling (kept at comfortable reading size — not reduced)
+HELP_SECTION_SPACING = 7   # Spacing between sections
+HELP_CONTENT_PADDING = 10  # Padding for content areas
 
 # GUI configuration
-GUI_RESIZABLE = False  # Set to False by default for consistent layout
+GUI_RESIZABLE = True   # Window is resizable; minimum size enforced in __init__
 
-DEFAULT_REMOTE_WELCOME_URL = "https://api.jsonsilo.com/public/d03caeff-8d84-4b55-bd8c-4b9ad6e7d372"
-DEFAULT_REMOTE_DICTIONARY_URL = "https://api.jsonsilo.com/public/245adbbb-9613-47ab-96bb-0e3e40385700"
+# UI size presets — controls fonts and window dimensions; applied live via _apply_ui_preset()
+UI_PRESETS = {
+    "Small":  {"font": 11, "font_small": 9,  "font_group": 12,
+               "width": 480, "height": 536, "tab_w": 95,  "tab_h": 18},
+    "Medium": {"font": 12, "font_small": 10, "font_group": 13,
+               "width": 560, "height": 640, "tab_w": 110, "tab_h": 20},
+    "Large":  {"font": 13, "font_small": 11, "font_group": 14,
+               "width": 640, "height": 720, "tab_w": 125, "tab_h": 22},
+}
+UI_PRESET_DEFAULT = "Small"
 
 # Project links
-PROJECT_REPOSITORY_URL = "https://github.com/boruta-project/star-conflict-chat-translator"
-USER_MANUAL_URL = "https://sites.google.com/view/sc-chat-translator/"
+PROJECT_REPOSITORY_URL = "https://github.com/jacek-mar/star-conflict-chat-translator"
+
+# Remote welcome message and community dictionary are plain files in the repository's
+# main branch (see remote/README.md); edits reach users after a push, within the
+# remote_fetch_interval (1 hour) plus GitHub's raw-file cache (~5 minutes).
+# SC_TRANSLATOR_REMOTE_BASE overrides it for testing (see scripts/run_sandbox.py).
+REMOTE_CONTENT_BASE_URL = os.environ.get(
+    "SC_TRANSLATOR_REMOTE_BASE",
+    "https://raw.githubusercontent.com/jacek-mar/star-conflict-chat-translator/main",
+).rstrip("/")
+DEFAULT_REMOTE_WELCOME_URL = f"{REMOTE_CONTENT_BASE_URL}/remote/welcome.json"
+DEFAULT_REMOTE_DICTIONARY_URL = f"{REMOTE_CONTENT_BASE_URL}/game_dictionary.json"
+# Former jsonsilo.com endpoints (≤ v1.3.0); saved settings pointing here are migrated.
+LEGACY_REMOTE_DICTIONARY_URLS = (
+    "https://api.jsonsilo.com/public/245adbbb-9613-47ab-96bb-0e3e40385700",
+)
+USER_MANUAL_URL = f"{PROJECT_REPOSITORY_URL}/blob/main/docs/user-guide.md"
+TRANSLATION_SERVICE_INFO_URL = f"{PROJECT_REPOSITORY_URL}/blob/main/docs/translation-service.md"
+RELEASES_URL = f"{PROJECT_REPOSITORY_URL}/releases"
+ISSUES_URL = f"{PROJECT_REPOSITORY_URL}/issues"
 
 DEFAULT_SETTINGS = {
     "last_language": "English",
     "manual_translate_lang": "ru",
+    # Optional, empty by default (anonymous MyMemory quota: 5,000 chars/day). Setting a
+    # personal email (Settings → Translation Service) raises it to 50,000 chars/day —
+    # see docs/design-translate-library-migration.md. Never hard-code a shared email;
+    # each user should use their own, or none.
+    "mymemory_email": "",
     "languages": {
         "English": "en",
         "Spanish": "es",
@@ -100,6 +139,8 @@ DEFAULT_SETTINGS = {
     "app_version": APP_VERSION,
     "allow_remote_dictionary": False,
     "remote_dictionary_url": DEFAULT_REMOTE_DICTIONARY_URL,
+    "remote_dictionary_overrides_local": False,  # when True remote entries replace local ones on conflict
+    "remote_dict_version": "",  # last fetched remote dict version/etag for conditional fetch
     "last_notified_version": APP_VERSION,
     "last_remote_fetch": 0,
     "remote_fetch_interval": 3600,  # 1 hour in seconds
@@ -108,8 +149,12 @@ DEFAULT_SETTINGS = {
     "remote_welcome_message": "",
     "remote_whats_new": None,
     "remote_download_url": "",
-    "remote_notes": ""
+    "remote_notes": "",
+    "ui_preset": "Small",       # UI size preset: Small / Medium / Large
 }
+
+STATUS_DEFAULT_TEXT = "Processing chat.log..."
+STATUS_NO_CHAT_LOG_TEXT = "Waiting for chat.log – check the logs folder in Settings"
 
 MANUAL_TRANSLATE_LANG = "ru"  # Temporary, example: Spanish
 MANUAL_TRANSLATE_PROMPT = "Want to translate something?"
@@ -204,25 +249,220 @@ DEFAULT_WELCOME_TEXT = (
     "This tool helps translate and manage in-game chat messages.\n"
     "It was created to improve the game experience for players from different countries.\n"
     "It is still in development and may contain minor bugs. Released under the MiT license. \n"
-    "The application uses the Google Translation engine and does not interfere with the game code.\n"
+    "The application uses a free translation service and does not interfere with the game code.\n"
     "Check your preferences in the Settings tab.\n\n"
     "Feel free to share your feedback about this program with me.\n"
     )
 
-def run_async_translation(coro):
-    """Helper to run async translation coroutines, handling event loop issues."""
+# EXPERIMENTAL (see docs/design-translate-library-migration.md): translation runs
+# through the `translate` package's MyMemory backend rather than Google. Google's free
+# scraping endpoints started blocking automated queries platform-wide in September 2026,
+# and deep-translator (the previous backend) is dormant with no fix. MyMemory is a
+# separate, independent service unaffected by that. Its own free-tier limits: ~500
+# chars/request, 5,000 chars/day anonymous (raised to 50,000/day with a registered
+# email — see the optional "mymemory_email" setting; never hard-code an email here, as
+# that would make every install of this app share one pool). from_lang="autodetect" is
+# MyMemory's own real (server-verified) auto-detect sentinel — not "auto".
+_MYMEMORY_AUTODETECT = "autodetect"
+
+# MyMemory doesn't publish a hard per-second cap the way Google's endpoint did, but
+# spacing calls out is still cheap, good API etiquette, and covers every call site
+# (main-thread startup sequence and the background chat-watch loop alike) with one
+# mechanism.
+_translate_lock = threading.Lock()
+_last_translate_call_ts = 0.0
+_MIN_SECONDS_BETWEEN_TRANSLATE_CALLS = 0.3
+
+
+def _throttle_translate_call():
+    """Block just long enough to keep translate calls spaced out app-wide."""
+    global _last_translate_call_ts
+    with _translate_lock:
+        wait = _last_translate_call_ts + _MIN_SECONDS_BETWEEN_TRANSLATE_CALLS - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_translate_call_ts = time.monotonic()
+
+
+# MyMemory refuses to "translate" text it auto-detects as already being in the target
+# language — e.g. short/ambiguous chat slang ("ping 200 xd") can be detected as matching
+# whatever language the user's target already is. Rather than a no-op, it raises this
+# exact error. That's not a real failure: the correct output IS the original text.
+_MYMEMORY_SAME_LANGUAGE_MESSAGE = "PLEASE SELECT TWO DISTINCT LANGUAGES"
+
+
+def _translate_text(text, target_lang, email=""):
+    """Translate text via MyMemory (through the `translate` package), auto-detecting source."""
+    _throttle_translate_call()
     try:
-        return asyncio.run(coro)
-    except RuntimeError as e:
-        if "Event loop is closed" in str(e) or "There is no current event loop" in str(e):
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(coro)
-            finally:
-                loop.close()
-        else:
-            raise
+        return MyMemoryTranslator(to_lang=target_lang, from_lang=_MYMEMORY_AUTODETECT, email=email).translate(text)
+    except TranslationError as e:
+        if _MYMEMORY_SAME_LANGUAGE_MESSAGE in str(e).upper():
+            return text
+        raise
+
+
+# --- Translation errors, quota pause and cache ---
+# Short labels shown in the chat instead of raw exceptions (which used to include the
+# full request URL). Technical details go to app.log only.
+TRANSLATION_ERROR_LABELS = {
+    "quota": "[not translated – daily limit reached]",
+    "network": "[not translated – translation service unreachable]",
+    "too_long": "[not translated – message too long for the free service]",
+    "other": "[not translated – translation error, see App Log]",
+}
+
+_MYMEMORY_QUOTA_MARKERS = ("TOO MANY REQUESTS", "YOU USED ALL AVAILABLE FREE TRANSLATIONS", "MYMEMORY WARNING")
+_MYMEMORY_LENGTH_MARKER = "QUERY LENGTH LIMIT EXCEEDED"
+# e.g. "...NEXT AVAILABLE IN  10 HOURS 32 MINUTES 50 SECONDS..."
+_MYMEMORY_RESET_RE = re.compile(
+    r"NEXT AVAILABLE IN\s+(?:(\d+)\s*HOURS?)?\s*(?:(\d+)\s*MINUTES?)?\s*(?:(\d+)\s*SECONDS?)?"
+)
+_DEFAULT_QUOTA_PAUSE_SECONDS = 10 * 60   # when MyMemory doesn't say when the quota resets
+_MAX_QUOTA_PAUSE_SECONDS = 24 * 3600
+_TRANSLATION_CACHE_SIZE = 1000
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _is_valid_email(value):
+    return bool(_EMAIL_RE.match(value or ""))
+
+
+def _parse_quota_reset_seconds(text):
+    """Seconds until MyMemory's quota resets, parsed from its warning text, or None."""
+    m = _MYMEMORY_RESET_RE.search(text.upper())
+    if not m or not any(m.groups()):
+        return None
+    hours, minutes, seconds = (int(g) if g else 0 for g in m.groups())
+    total = hours * 3600 + minutes * 60 + seconds
+    return max(60, min(total, _MAX_QUOTA_PAUSE_SECONDS))
+
+
+def _translation_error_text(exc):
+    """Collect everything an exception tells us: message, HTTP body, MyMemory JSON."""
+    parts = [str(exc)]
+    response = getattr(exc, "response", None)
+    if response is not None:
+        try:
+            parts.append(response.text or "")
+        except Exception:
+            pass
+    data = getattr(exc, "json", None)  # set by translate's MyMemory provider
+    if isinstance(data, dict):
+        parts.append(str(data.get("responseDetails", "")))
+    return " ".join(parts)
+
+
+def _classify_translation_error(exc):
+    """Return (kind, retry_after_seconds) — kind is a TRANSLATION_ERROR_LABELS key."""
+    text = _translation_error_text(exc).upper()
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status == 429 or text.startswith("429 ") or any(m in text for m in _MYMEMORY_QUOTA_MARKERS):
+        return "quota", _parse_quota_reset_seconds(text)
+    if _MYMEMORY_LENGTH_MARKER in text:
+        return "too_long", None
+    if isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+        return "network", None
+    return "other", None
+
+
+def _has_letters(text):
+    """True if text contains a letter of any script. Text without letters (numbers,
+    punctuation, emoji) has nothing to translate and is shown unchanged."""
+    return any(ch.isalpha() for ch in text)
+
+
+class TranslationOutcome(NamedTuple):
+    text: str               # translation, unchanged original, or a short error label
+    ok: bool                # False → text is a TRANSLATION_ERROR_LABELS label
+    kind: str = "ok"        # ok / cached / skipped / quota / network / too_long / other
+    detail: str = ""        # technical error detail for app.log
+    new_pause: bool = False  # True only on the call that started a quota pause
+
+
+class TranslationService:
+    """Wraps _translate_text with an LRU cache, the no-letters skip and a quota pause.
+
+    Never changes what is displayed for a successful translation; it only avoids
+    requests whose result is already known or that would certainly fail.
+    """
+
+    def __init__(self, cache_size=_TRANSLATION_CACHE_SIZE, clock=time.time):
+        self._cache = OrderedDict()
+        self._cache_size = cache_size
+        self._lock = threading.Lock()
+        self._clock = clock
+        self.paused_until = 0.0
+
+    def is_paused(self):
+        return self._clock() < self.paused_until
+
+    def resume(self):
+        self.paused_until = 0.0
+
+    def translate(self, text, target_lang, email=""):
+        if not _has_letters(text):
+            return TranslationOutcome(text, True, "skipped")
+
+        key = (text, target_lang)
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+                return TranslationOutcome(self._cache[key], True, "cached")
+
+        if self.is_paused():
+            return TranslationOutcome(TRANSLATION_ERROR_LABELS["quota"], False, "quota")
+
+        try:
+            result = _translate_text(text, target_lang, email=email)
+            if not result:
+                raise TranslationError("Empty translation returned")
+            if result.upper().startswith("MYMEMORY WARNING"):
+                # Quota warning delivered as a "translation" — never show it as one.
+                raise TranslationError(result)
+        except Exception as e:
+            kind, retry_after = _classify_translation_error(e)
+            new_pause = False
+            if kind == "quota":
+                self.paused_until = self._clock() + (retry_after or _DEFAULT_QUOTA_PAUSE_SECONDS)
+                new_pause = True
+            return TranslationOutcome(TRANSLATION_ERROR_LABELS[kind], False, kind, str(e), new_pause)
+
+        with self._lock:
+            self._cache[key] = result
+            self._cache.move_to_end(key)
+            while len(self._cache) > self._cache_size:
+                self._cache.popitem(last=False)
+        return TranslationOutcome(result, True, "ok")
+
+
+# --- Star Conflict log folder ---
+# The game moved its profile and logs from Documents\My Games to %LOCALAPPDATA%\Targem
+# (first seen 2026-10-09). Both are checked; the new location wins.
+def _local_appdata_dir():
+    return os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Local")
+
+
+def _new_game_logs_path():
+    return os.path.join(_local_appdata_dir(), "Targem", "StarConflict", "logs")
+
+
+def _legacy_game_logs_path():
+    return os.path.join(os.path.expanduser("~"), "Documents", "My Games", "StarConflict", "logs")
+
+
+def _same_path(a, b):
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+
+
+def _latest_session_time(logs_folder):
+    """Modification time of the newest game session folder, or None if there is none."""
+    try:
+        times = [f.stat().st_mtime for f in Path(logs_folder).iterdir() if f.is_dir()]
+    except OSError:
+        return None
+    return max(times) if times else None
 
 
 def compare_versions(remote_ver: str, local_ver: str) -> int:
@@ -283,20 +523,13 @@ class TranslatedFileWatcher(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Load and save settings to guarantee consistency
-        self.settings_path = self._get_settings_path()   #
-        self.settings = self._load_settings()            # load settings (creates file on first run)
-        self._save_settings()                            # ensure settings file has all defaults
-
         # --- Logger (initialize early to avoid issues with remote fetches) ---
         self.logger, self.app_log_path = self._init_logger()
         self.logger.info("Application started")
 
         # GUI configuration
         self.title("SC Chat Translator "+APP_VERSION)
-        # self.geometry("640x670") - optimal application window size
-        self.geometry(f"{DEFAULT_WINDOW_WIDTH}x{DEFAULT_WINDOW_HEIGHT}")
-        self.resizable(GUI_RESIZABLE, GUI_RESIZABLE)  # Use global setting
+        self.resizable(GUI_RESIZABLE, GUI_RESIZABLE)
 
         ctk.set_appearance_mode("Dark")
         ctk.set_default_color_theme("blue")
@@ -312,7 +545,18 @@ class TranslatedFileWatcher(ctk.CTk):
         self.settings_path = self._get_settings_path()
         self.dictionary_path = self._get_dictionary_path()
         self.settings = self._load_settings()
-        self.game_dictionary = self._load_dictionary()
+        self.translation_service = TranslationService()
+        self._status_shows_pause = False
+        self._logs_path_migrated = self._migrate_game_logs_path()
+
+        # --- Apply UI preset: geometry + font globals (must be before any widget creation) ---
+        _p = UI_PRESETS.get(self.settings.get("ui_preset", UI_PRESET_DEFAULT),
+                            UI_PRESETS[UI_PRESET_DEFAULT])
+        self.geometry(f"{_p['width']}x{_p['height']}")
+        self.minsize(_p['width'], _p['height'])
+        # Load local dictionary only — remote fetch happens in background thread after startup
+        self.game_dictionary = self._load_local_dictionary()
+        self._rebuild_dict_patterns()
 
         self.settings.setdefault("welcome_counter", 0)
 
@@ -322,7 +566,6 @@ class TranslatedFileWatcher(ctk.CTk):
 
         # --- Paths / translator / state ---
         self.parent_folder = Path(self.settings["game_logs_path"])
-        self.translator = Translator()
         self.stop_flag = False
         self.current_logfile = None
         self.session_id = None
@@ -332,35 +575,46 @@ class TranslatedFileWatcher(ctk.CTk):
         self.target_lang = self.languages[self.settings["last_language"]]
         self.manual_translate_lang = self.settings["manual_translate_lang"]
 
+        # --- Shared font objects (updated in-place by _apply_ui_preset) ---
+        # Also update module globals so future one-off CTkFont() calls use correct size
+        global APP_FONT_SIZE, APP_FONT_SIZE_SMALL, APP_FONT_SIZE_GROUP
+        APP_FONT_SIZE       = _p["font"]
+        APP_FONT_SIZE_SMALL = _p["font_small"]
+        APP_FONT_SIZE_GROUP = _p["font_group"]
+        self._fnt      = ctk.CTkFont(size=APP_FONT_SIZE)
+        self._fnt_grp  = ctk.CTkFont(size=APP_FONT_SIZE_GROUP)
+        self._fnt_hint = ctk.CTkFont(size=APP_FONT_SIZE_SMALL)
+
         # --- Status Bar with Help Button ---
         self.status_frame = ctk.CTkFrame(self, fg_color='transparent')
-        self.status_frame.pack(fill="x", padx=10, pady=5)
+        self.status_frame.pack(fill="x", padx=8, pady=3)
 
-        # Status label (90% width)
+        # Status label
         self.status_label = ctk.CTkLabel(
             self.status_frame,
-            text="Processing chat.log...",
-            anchor="w"
+            text=STATUS_DEFAULT_TEXT,
+            anchor="w",
+            font=self._fnt
         )
         self.status_label.pack(side="left", fill="x", expand=True)
 
-        # Help button (10% width)
+        # Help button
         self.help_button = ctk.CTkButton(
             self.status_frame,
             image=self.help_icon_img,
             text="",
-            width=int(DEFAULT_WINDOW_WIDTH * HELP_BUTTON_RATIO * 0.1),  # Small button
+            width=int(DEFAULT_WINDOW_WIDTH * HELP_BUTTON_RATIO),
             height=BUTTON_HEIGHT,
             command=self._toggle_help_content
         )
-        self.help_button.pack(side="right", padx=(5, 0))
+        self.help_button.pack(side="right", padx=(4, 0))
 
         # --- Main Content Container ---
         self.main_content_frame = ctk.CTkFrame(self, fg_color='transparent')
-        self.main_content_frame.pack(fill="both", expand=True, padx=0, pady=10)
+        self.main_content_frame.pack(fill="both", expand=True, padx=0, pady=6)
 
         # --- Tabs ---
-        self.tabview = ctk.CTkTabview(self.main_content_frame, width=625, height=575)
+        self.tabview = ctk.CTkTabview(self.main_content_frame)
         self.tabview.pack(fill="both", expand=True, padx=0, pady=0)
 
         self.tab1 = self.tabview.add("Chat")
@@ -369,7 +623,7 @@ class TranslatedFileWatcher(ctk.CTk):
         self.tab3 = self.tabview.add("Settings")
 
         for button in self.tabview._segmented_button._buttons_dict.values():
-            button.configure(width=125, height=20)
+            button.configure(width=_p["tab_w"], height=_p["tab_h"])
 
         # --- Help Content Frame (initially hidden) ---
         self.help_content_frame = ctk.CTkScrollableFrame(self.main_content_frame)
@@ -377,8 +631,10 @@ class TranslatedFileWatcher(ctk.CTk):
         self.help_content_frame.pack_forget()  # Hide initially
 
         # --- Chat Text areas ---
-        self.text_area_tab1 = ctk.CTkTextbox(self.tab1, wrap=tk.WORD)
-        self.text_area_tab1.pack(expand=True, fill="both", padx=10, pady=10)
+        self.text_area_tab1 = ctk.CTkTextbox(
+            self.tab1, wrap=tk.WORD, font=self._fnt
+        )
+        self.text_area_tab1.pack(expand=True, fill="both", padx=6, pady=6)
 
         # # --- User translation output area ---
         # self.text_area_tab1.tag_config("manual_header", foreground="gold")  # or any color
@@ -387,8 +643,9 @@ class TranslatedFileWatcher(ctk.CTk):
         # --- Welcome message shown at startup ---
         self._insert_hardcoded_message()
 
-        # --- Check remote welcome first ---
-        self._check_remote_welcome()  # may reset welcome_counter and set override text
+        # --- Schedule remote fetch in background (non-blocking startup) ---
+        # Remote welcome/version check and dictionary sync run after the window is shown.
+        threading.Thread(target=self._remote_startup_fetch, daemon=True).start()
 
         if self.settings["welcome_counter"] < 11:
             # Check if we should show extended message (new version detected)
@@ -397,6 +654,7 @@ class TranslatedFileWatcher(ctk.CTk):
             if show_extended:
                 # Show extended message with all fields (whats_new, changes, notes, download_url)
                 self._insert_extended_welcome_message()
+                self.settings["show_extended_welcome"] = False  # reset so it only shows once
                 self.logger.info(f"Showing extended welcome message (counter: {self.settings['welcome_counter'] + 1}/10)")
             else:
                 # Show normal welcome message (only welcome_message)
@@ -418,6 +676,14 @@ class TranslatedFileWatcher(ctk.CTk):
 
         # --- User translation output area ---
         self.text_area_tab1.tag_config("manual_header", foreground="gold")  # or any color
+        self.text_area_tab1.tag_config("translation_notice", foreground="gold")
+
+        if self._logs_path_migrated:
+            self._insert_message_tab1(
+                "ℹ Star Conflict now keeps its chat logs in a new folder. Switched to:\n"
+                f"   {self.settings['game_logs_path']}\n",
+                "translation_notice",
+            )
 
         # Tags
         self.text_area_tab1.tag_config("original", foreground="lightgrey")
@@ -438,21 +704,27 @@ class TranslatedFileWatcher(ctk.CTk):
 
         # --- Manual Translation Input at bottom of Chat tab ---
         bottom_frame = ctk.CTkFrame(self.tab1)
-        bottom_frame.pack(fill="x", padx=10, pady=(0, 10))
+        bottom_frame.pack(fill="x", padx=6, pady=(0, 6))
 
         # Dynamic placeholder translation
         placeholder_hint = self._safe_translate(MANUAL_TRANSLATE_PROMPT, self.target_lang)
-        self.manual_entry = ctk.CTkEntry(bottom_frame, placeholder_text=placeholder_hint, width=500)
-        self.manual_entry.pack(side="left", padx=(5, 10), pady=5, expand=True, fill="x")
+        self.manual_entry = ctk.CTkEntry(
+            bottom_frame,
+            placeholder_text=placeholder_hint,
+            font=self._fnt
+        )
+        self.manual_entry.pack(side="left", padx=(4, 6), pady=4, expand=True, fill="x")
 
         # Button showing short language code
         self.btn_translate = ctk.CTkButton(
             bottom_frame,
             text=self._get_short_code_for_lang(self.manual_translate_lang),
-            width=50,
+            width=40,
+            height=BUTTON_HEIGHT,
+            font=self._fnt,
             command=self._manual_translate
         )
-        self.btn_translate.pack(side="left", padx=(0, 5), pady=5)
+        self.btn_translate.pack(side="left", padx=(0, 4), pady=4)
 
         # Bind Enter key to trigger translation
         self.manual_entry.bind("<Return>", lambda e: self._manual_translate())
@@ -460,238 +732,350 @@ class TranslatedFileWatcher(ctk.CTk):
         
         # --- History tab ---
         top_hist = ctk.CTkFrame(self.tab_history)
-        top_hist.pack(fill="x", padx=10, pady=(10, 0))
+        top_hist.pack(fill="x", padx=6, pady=(6, 0))
 
-        ctk.CTkLabel(top_hist, text="Date (YYYY-MM-DD):").pack(side="left", padx=(10, 5), pady=10)
+        ctk.CTkLabel(
+            top_hist, text="Date:",
+            font=self._fnt
+        ).pack(side="left", padx=(6, 3), pady=6)
+
         self.history_date_var = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
-        self.history_date_entry = ctk.CTkEntry(top_hist, textvariable=self.history_date_var, width=160)
-        self.history_date_entry.pack(side="left", padx=(0, 10), pady=10)
+        self.history_date_entry = ctk.CTkEntry(
+            top_hist, textvariable=self.history_date_var,
+            width=115, font=self._fnt
+        )
+        self.history_date_entry.pack(side="left", padx=(0, 6), pady=6)
 
-        self.btn_load_date = ctk.CTkButton(top_hist, text="Load Date", command=self._load_history_for_date)
-        self.btn_load_date.pack(side="left", padx=5, pady=10)
+        self.btn_load_date = ctk.CTkButton(
+            top_hist, text="Load Date",
+            height=BUTTON_HEIGHT, font=self._fnt,
+            command=self._load_history_for_date
+        )
+        self.btn_load_date.pack(side="left", padx=(0, 4), pady=6)
 
-        self.btn_load_last_session = ctk.CTkButton(top_hist, text="Load Last Session", command=self._load_history_last_session)
-        self.btn_load_last_session.pack(side="left", padx=5, pady=10)
+        self.btn_load_last_session = ctk.CTkButton(
+            top_hist, text="Last Session",
+            height=BUTTON_HEIGHT, font=self._fnt,
+            command=self._load_history_last_session
+        )
+        self.btn_load_last_session.pack(side="left", padx=(0, 4), pady=6)
 
-        self.history_text = ctk.CTkTextbox(self.tab_history, wrap=tk.WORD)
-        self.history_text.pack(expand=True, fill="both", padx=10, pady=10)
+        self.history_text = ctk.CTkTextbox(
+            self.tab_history, wrap=tk.WORD,
+            font=self._fnt
+        )
+        self.history_text.pack(expand=True, fill="both", padx=6, pady=6)
         self.history_text.configure(state="disabled")
 
 
         # --- App Log tab ---
         top_log = ctk.CTkFrame(self.tab_log)
-        top_log.pack(fill="x", padx=10, pady=(10, 0))
+        top_log.pack(fill="x", padx=6, pady=(6, 0))
 
-        self.btn_open_log = ctk.CTkButton(top_log, text="Open Log File", command=self._open_app_log_file)
-        self.btn_open_log.pack(side="left", padx=10, pady=10)
+        self.btn_open_log = ctk.CTkButton(
+            top_log, text="Open Log File",
+            height=BUTTON_HEIGHT, font=self._fnt,
+            command=self._open_app_log_file
+        )
+        self.btn_open_log.pack(side="left", padx=6, pady=6)
 
-        self.app_log_text = ctk.CTkTextbox(self.tab_log, wrap=tk.WORD)
-        self.app_log_text.pack(expand=True, fill="both", padx=10, pady=10)
+        self.app_log_text = ctk.CTkTextbox(
+            self.tab_log, wrap=tk.WORD,
+            font=self._fnt
+        )
+        self.app_log_text.pack(expand=True, fill="both", padx=6, pady=6)
         self.app_log_text.configure(state="disabled")
 
 
-        # --- Settings tab ---
-        # Single centered label above the columns
-        ctk.CTkLabel(self.tab3, text="Translation languages").pack(pady=(10, 5))
+        # --- Settings tab — scrollable container ---
+        settings_scroll = ctk.CTkScrollableFrame(self.tab3)
+        settings_scroll.pack(fill="both", expand=True, padx=3, pady=3)
 
-        # Create main container for two-column layout
-        main_container = ctk.CTkFrame(self.tab3, fg_color='transparent')
-        main_container.pack(fill="both", expand=False, padx=10, pady=(0, 10))
+        # Convenience aliases — all settings widgets share these instances
+        # so _apply_ui_preset() can update them all via .configure()
+        _fnt      = self._fnt
+        _fnt_grp  = self._fnt_grp
+        _fnt_hint = self._fnt_hint
 
-        # Left column
-        left_column = ctk.CTkFrame(main_container)
-        left_column.pack(side="left", fill="both", expand=True, padx=(0, 2))
+        # ── Group 1: Translation Languages ──────────────────────────────────────
+        grp_lang = ctk.CTkFrame(settings_scroll)
+        grp_lang.pack(fill="x", padx=5, pady=(6, 3))
 
-        # Right column
-        right_column = ctk.CTkFrame(main_container)
-        right_column.pack(side="right", fill="both", expand=True, padx=(2, 0))
+        ctk.CTkLabel(grp_lang, text="Translation Languages", font=_fnt_grp
+                     ).pack(anchor="w", padx=7, pady=(4, 2))
 
-        # Left column content
-        # Chat translation language picker
-        row = ctk.CTkFrame(left_column)
-        row.pack(pady=3, padx=(0, 20))
+        lang_row = ctk.CTkFrame(grp_lang, fg_color="transparent")
+        lang_row.pack(fill="x", padx=7, pady=(0, 3))
 
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
-
+        # Chat translation language
+        ctk.CTkLabel(lang_row, text="Chat →", font=_fnt).pack(side="left", padx=(0, 3))
         self.language_var = tk.StringVar(value=self.settings["last_language"])
         self.language_menu = ctk.CTkOptionMenu(
-            row,
+            lang_row,
             values=list(self.languages.keys()),
             variable=self.language_var,
             command=self._change_language,
             height=BUTTON_HEIGHT,
+            width=130,
+            font=_fnt,
         )
-        self.language_menu.pack(side="left", padx=(0, 5))
+        self.language_menu.pack(side="left", padx=(0, 8))
+        ToolTip(self.language_menu, "Select the language into which the game chat should be translated")
 
-        ToolTip(icon, "Select the language into which the game chat should be translated")
-
-        # Open Settings File button
-        row = ctk.CTkFrame(left_column)
-        row.pack(pady=3, padx=(0, 20))
-
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
-
-        btn = ctk.CTkButton(row, text="Open Settings File", height=BUTTON_HEIGHT, command=self._open_settings_file)
-        btn.pack(side="left", padx=(0, 5))
-
-        ToolTip(icon, "Manually change the language settings in the JSON file using the default editor.")
-
-        # Right column content
-        # Manual translation language picker
-        row = ctk.CTkFrame(right_column)
-        row.pack(pady=3, padx=(0, 20))
-
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
-
+        # Manual translation language
+        ctk.CTkLabel(lang_row, text="Manual →", font=_fnt).pack(side="left", padx=(0, 3))
         self.manual_lang_var = tk.StringVar(value=self._get_short_code_for_lang(self.manual_translate_lang))
         self.manual_lang_menu = ctk.CTkOptionMenu(
-            row,
+            lang_row,
             values=list(self.manual_languages.keys()),
             variable=self.manual_lang_var,
             command=self._change_manual_language,
             height=BUTTON_HEIGHT,
+            width=75,
+            font=_fnt,
         )
-        self.manual_lang_menu.pack(side="left", padx=(0, 5))
+        self.manual_lang_menu.pack(side="left")
+        ToolTip(self.manual_lang_menu, "Select the language for manual text translation input")
 
-        ToolTip(icon, "Select the language for manual text translation input")
+        # Apply + Open Settings on the same row
+        action_row = ctk.CTkFrame(grp_lang, fg_color="transparent")
+        action_row.pack(fill="x", padx=7, pady=(0, 5))
 
-        # Apply Changes button
-        row = ctk.CTkFrame(right_column)
-        row.pack(pady=3, padx=(0, 20))
+        ctk.CTkButton(
+            action_row, text="Apply Changes",
+            height=BUTTON_HEIGHT, font=_fnt,
+            command=self._apply_settings_changes
+        ).pack(side="left", padx=(0, 6))
 
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
+        ctk.CTkButton(
+            action_row, text="Open Settings File",
+            height=BUTTON_HEIGHT, font=_fnt,
+            command=self._open_settings_file
+        ).pack(side="left")
 
-        btn = ctk.CTkButton(row, text="Apply Changes", height=BUTTON_HEIGHT, command=self._apply_settings_changes)
-        btn.pack(side="left", padx=(0, 5))
+        # ── Group 1b: Translation Service ───────────────────────────────────────
+        grp_service = ctk.CTkFrame(settings_scroll)
+        grp_service.pack(fill="x", padx=5, pady=3)
 
-        ToolTip(icon, "Reloads settings and dictionary from disk without restarting the app.")
+        ctk.CTkLabel(grp_service, text="Translation Service (MyMemory)", font=_fnt_grp
+                     ).pack(anchor="w", padx=7, pady=(4, 2))
 
+        email_row = ctk.CTkFrame(grp_service, fg_color="transparent")
+        email_row.pack(fill="x", padx=7, pady=(0, 3))
 
-        # Game logs section
-        ctk.CTkLabel(self.tab3, text="StarConflict game logs folder:").pack(pady=(10, 5))
+        self.mymemory_email_var = tk.StringVar(value=self.settings.get("mymemory_email", ""))
+        self.mymemory_email_entry = ctk.CTkEntry(
+            email_row, textvariable=self.mymemory_email_var,
+            placeholder_text="Your email (optional)", font=_fnt
+        )
+        self.mymemory_email_entry.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        ctk.CTkButton(
+            email_row, text="Save",
+            height=BUTTON_HEIGHT, width=45, font=_fnt,
+            command=self._save_mymemory_email
+        ).pack(side="left", padx=(0, 4))
+
+        ctk.CTkButton(
+            email_row, text="Clear",
+            height=BUTTON_HEIGHT, width=45, font=_fnt,
+            command=self._clear_mymemory_email
+        ).pack(side="left")
+
+        self.mymemory_email_status = ctk.CTkLabel(grp_service, text="", text_color="gray", font=_fnt_hint)
+        self.mymemory_email_status.pack(anchor="w", padx=7)
+
+        ctk.CTkLabel(
+            grp_service,
+            text="Optional: raises the free daily limit from 5,000 to 50,000 characters.\n"
+                 "Use your own address — it is stored only in settings.json and sent only to MyMemory.",
+            font=_fnt_hint, text_color="gray", justify="left"
+        ).pack(anchor="w", padx=7, pady=(0, 1))
+
+        service_info_link = ctk.CTkLabel(
+            grp_service,
+            text="Why does an email raise the limit? Why not Google Translate? — Read more",
+            font=_fnt_hint, text_color=LINK_COLOR, cursor=LINK_CURSOR
+        )
+        service_info_link.pack(anchor="w", padx=7, pady=(0, 5))
+        service_info_link.bind("<Button-1>", lambda e: self._open_link(TRANSLATION_SERVICE_INFO_URL))
+        ToolTip(service_info_link, "Opens the explanation on GitHub in your web browser")
+
+        # ── Group 2: Game Logs Path ──────────────────────────────────────────────
+        grp_path = ctk.CTkFrame(settings_scroll)
+        grp_path.pack(fill="x", padx=5, pady=3)
+
+        ctk.CTkLabel(grp_path, text="Star Conflict Logs Folder", font=_fnt_grp
+                     ).pack(anchor="w", padx=7, pady=(4, 2))
 
         self.game_path_var = tk.StringVar(value=str(self.parent_folder))
-        self.game_path_entry = ctk.CTkEntry(self.tab3, textvariable=self.game_path_var, width=600)
-        self.game_path_entry.pack(pady=5)
+        self.game_path_entry = ctk.CTkEntry(
+            grp_path, textvariable=self.game_path_var, font=_fnt
+        )
+        self.game_path_entry.pack(fill="x", padx=7, pady=(0, 3))
 
-        # Third button - Browse with Tooltip to the left
-        row = ctk.CTkFrame(self.tab3)
-        row.pack(pady=3, padx=(0, 20))   # shift entire row 20px to the left
+        path_btns = ctk.CTkFrame(grp_path, fg_color="transparent")
+        path_btns.pack(fill="x", padx=7, pady=(0, 5))
 
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
+        ctk.CTkButton(
+            path_btns, text="Browse",
+            height=BUTTON_HEIGHT, font=_fnt,
+            command=self._browse_game_folder
+        ).pack(side="left", padx=(0, 4))
 
-        # Main button
-        btn = ctk.CTkButton(row, text="Browse", height=BUTTON_HEIGHT, command=self._browse_game_folder)
-        btn.pack(side="left", padx=(0, 5))
-        
-        # Tooltip bound to the icon only
-        ToolTip(icon, "If the application is unable to locate the game folder automatically,\n" \
-        " select the folder named 'logs' where Star Conflict saves its chat.log files manually.")
+        ctk.CTkButton(
+            path_btns, text="Save Path",
+            height=BUTTON_HEIGHT, font=_fnt,
+            command=self._save_game_path
+        ).pack(side="left", padx=(0, 4))
 
-        # Fourth button - Save Path with Tooltip to the left
-        row = ctk.CTkFrame(self.tab3)
-        row.pack(pady=3, padx=(0, 20))   # shift entire row 20px to the left
+        ctk.CTkButton(
+            path_btns, text="Reset to Default",
+            height=BUTTON_HEIGHT, font=_fnt,
+            command=self._reset_game_path
+        ).pack(side="left")
 
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
+        # ── Group 3: Game Dictionary ─────────────────────────────────────────────
+        grp_dict = ctk.CTkFrame(settings_scroll)
+        grp_dict.pack(fill="x", padx=5, pady=3)
 
-        # Main button
-        btn = ctk.CTkButton(row, text="Save Path", height=BUTTON_HEIGHT, command=self._save_game_path)
-        btn.pack(side="left", padx=(0, 5))
-        
-        # Tooltip bound to the icon only
-        ToolTip(icon, "Save the previously selected path to the game's 'logs' folder.")
+        ctk.CTkLabel(grp_dict, text="Game Dictionary", font=_fnt_grp
+                     ).pack(anchor="w", padx=7, pady=(4, 2))
 
-        # Fifth button - Reset to Default Path with Tooltip to the left
-        row = ctk.CTkFrame(self.tab3)
-        row.pack(pady=3, padx=(0, 20))   # shift entire row 20px to the left
+        dict_top_row = ctk.CTkFrame(grp_dict, fg_color="transparent")
+        dict_top_row.pack(fill="x", padx=7, pady=(0, 3))
 
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
+        ctk.CTkButton(
+            dict_top_row, text="Open Dictionary File",
+            height=BUTTON_HEIGHT, font=_fnt,
+            command=self._open_dictionary_file
+        ).pack(side="left")
 
-        # Main button
-        btn = ctk.CTkButton(row, text="Reset to Default Path", height=BUTTON_HEIGHT, command=self._reset_game_path)
-        btn.pack(side="left", padx=(0, 5))
-        
-        # Tooltip bound to the icon only
-        ToolTip(icon, "Reset the default path to the game folder named 'logs'.")
+        # Add-entry row: Key field + Translation field + Add + Reload — all on one line
+        ctk.CTkLabel(grp_dict, text="Add entry:", font=_fnt).pack(anchor="w", padx=7)
 
-        # NEW: Export History to CSV
-        # self.export_csv_button = ctk.CTkButton(self.tab3, text="Export History to CSV", command=self._export_history_to_csv)
-        # self.export_csv_button.pack(pady=15)
+        self.dict_entry_frame = ctk.CTkFrame(grp_dict, fg_color="transparent")
+        self.dict_entry_frame.pack(fill="x", padx=7, pady=(2, 3))
 
-        # Open Game Dictionary
-        ctk.CTkLabel(self.tab3, text="Change custom dictionary settings:").pack(pady=(10, 5))
+        self.dict_key_entry = ctk.CTkEntry(
+            self.dict_entry_frame, placeholder_text="Key",
+            width=100, font=_fnt
+        )
+        self.dict_key_entry.pack(side="left", padx=(0, 4))
 
-        # Sixth button - Open Game Dictionary with Tooltip to the left
-        row = ctk.CTkFrame(self.tab3)
-        row.pack(pady=3, padx=(0, 20))   # shift entire row 20px to the left
+        self.dict_value_entry = ctk.CTkEntry(
+            self.dict_entry_frame, placeholder_text="Translation", font=_fnt
+        )
+        self.dict_value_entry.pack(side="left", fill="x", expand=True, padx=(0, 4))
 
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
+        ctk.CTkButton(
+            self.dict_entry_frame, text="Add",
+            height=BUTTON_HEIGHT, width=45, font=_fnt,
+            command=self._add_dictionary_entry
+        ).pack(side="left", padx=(0, 4))
 
-        # Main button
-        btn = ctk.CTkButton(row, text="Open Game Dictionary", height=BUTTON_HEIGHT, command=self._open_dictionary_file)
-        btn.pack(side="left", padx=(0, 5))
-        
-        # Tooltip bound to the icon only
-        ToolTip(icon, "Open the custom game dictionary to manually make changes to this file.")
+        ctk.CTkButton(
+            self.dict_entry_frame, text="Reload",
+            height=BUTTON_HEIGHT, width=55, font=_fnt,
+            command=self._reload_dictionary
+        ).pack(side="left")
 
-        # Entry fields for adding/updating dictionary entries with frame for side-by-side entries.
+        ctk.CTkLabel(
+            grp_dict,
+            text="Key = game term  ·  Translation = replacement in chat",
+            font=_fnt_hint, text_color="gray"
+        ).pack(anchor="w", padx=7, pady=(0, 5))
 
-        ctk.CTkLabel(self.tab3, text="Add new entries to the custom dictionary").pack(pady=(5, 5)) 
+        # ── Group 4: Remote Dictionary ───────────────────────────────────────────
+        grp_remote = ctk.CTkFrame(settings_scroll)
+        grp_remote.pack(fill="x", padx=5, pady=(3, 6))
 
-        self.dict_entry_frame = ctk.CTkFrame(self.tab3)
-        self.dict_entry_frame.pack(pady=5)
+        ctk.CTkLabel(grp_remote, text="Remote Dictionary", font=_fnt_grp
+                     ).pack(anchor="w", padx=7, pady=(4, 2))
 
-        self.dict_key_entry = ctk.CTkEntry(self.dict_entry_frame, placeholder_text="Key", width=120)
-        self.dict_key_entry.pack(side="left", padx=5)
-
-        self.dict_value_entry = ctk.CTkEntry(self.dict_entry_frame, placeholder_text="Value", width=200)
-        self.dict_value_entry.pack(side="left", padx=5)
-
-        # Seventh button - Update / Reload Dictionary with Tooltip to the left
-        row = ctk.CTkFrame(self.tab3)
-        row.pack(pady=3, padx=(0, 20))   # shift entire row 20px to the left
-
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
-
-        # Main button
-        btn = ctk.CTkButton(row, text="Update / Reload Dictionary", height=BUTTON_HEIGHT, command=self._update_dictionary_entry)
-        btn.pack(side="left", padx=(0, 5))
-        
-        # Tooltip bound to the icon only    
-        ToolTip(icon, "Confirm and reload the settings of the changes made in the game dictionary.")
-
-        # Remote dictionary option
         self.remote_dict_var = tk.BooleanVar(value=self.settings.get("allow_remote_dictionary", False))
-
-        row = ctk.CTkFrame(self.tab3)
-        row.pack(pady=3, padx=(0, 20))
-
-        icon = ctk.CTkLabel(row, image=self.help_icon_img, text="", cursor="question_arrow")
-        icon.pack(side="left", padx=(0, 9))
-
         remote_switch = ctk.CTkSwitch(
-            row,
-            text="Allow remote dictionary download",
+            grp_remote,
+            text="Enable remote dictionary sync",
             variable=self.remote_dict_var,
             command=self._toggle_remote_dictionary,
-            onvalue=True,
-            offvalue=False
+            onvalue=True, offvalue=False,
+            font=_fnt,
         )
-        remote_switch.pack(side="left", padx=(0, 5))
+        remote_switch.pack(anchor="w", padx=7, pady=(0, 2))
+        ToolTip(
+            remote_switch,
+            "Download community dictionary entries and merge them with your local dictionary.\n"
+            "Local entries always take priority unless 'Remote overrides local' is enabled."
+        )
 
-        # Tooltip for help icon
-        ToolTip(icon, "Enable or disable downloading a remote dictionary. When enabled,\n"
-                    "the app will merge entries from the remote dictionary into your local one.")
+        self.remote_override_var = tk.BooleanVar(
+            value=self.settings.get("remote_dictionary_overrides_local", False)
+        )
+        override_switch = ctk.CTkSwitch(
+            grp_remote,
+            text="Remote overrides local on conflict",
+            variable=self.remote_override_var,
+            command=self._toggle_remote_override,
+            onvalue=True, offvalue=False,
+            font=_fnt,
+        )
+        override_switch.pack(anchor="w", padx=7, pady=(0, 3))
+        ToolTip(
+            override_switch,
+            "When enabled, community dictionary entries replace your local ones on key conflicts.\n"
+            "Disable to keep your custom translations safe."
+        )
 
+        sync_row = ctk.CTkFrame(grp_remote, fg_color="transparent")
+        sync_row.pack(fill="x", padx=7, pady=(0, 3))
+
+        self.btn_sync_dict = ctk.CTkButton(
+            sync_row, text="Sync Now",
+            height=BUTTON_HEIGHT, font=_fnt,
+            command=self._sync_remote_dictionary_now
+        )
+        self.btn_sync_dict.pack(side="left", padx=(0, 8))
+
+        self.dict_sync_status = ctk.CTkLabel(sync_row, text="", text_color="gray", font=_fnt_hint)
+        self.dict_sync_status.pack(side="left")
+
+        ctk.CTkLabel(
+            grp_remote,
+            text="Fetched at most once per hour (rate-limited).",
+            font=_fnt_hint, text_color="gray"
+        ).pack(anchor="w", padx=7, pady=(0, 5))
+
+        # ── Group 5: Appearance ──────────────────────────────────────────────────
+        grp_appearance = ctk.CTkFrame(settings_scroll)
+        grp_appearance.pack(fill="x", padx=5, pady=(3, 6))
+
+        ctk.CTkLabel(grp_appearance, text="Appearance", font=_fnt_grp
+                     ).pack(anchor="w", padx=7, pady=(4, 2))
+
+        appearance_row = ctk.CTkFrame(grp_appearance, fg_color="transparent")
+        appearance_row.pack(fill="x", padx=7, pady=(0, 3))
+
+        ctk.CTkLabel(appearance_row, text="UI Size:", font=_fnt).pack(side="left", padx=(0, 6))
+
+        self.ui_preset_var = tk.StringVar(value=self.settings.get("ui_preset", UI_PRESET_DEFAULT))
+        self.ui_preset_menu = ctk.CTkOptionMenu(
+            appearance_row,
+            values=list(UI_PRESETS.keys()),
+            variable=self.ui_preset_var,
+            command=self._apply_ui_preset,
+            height=BUTTON_HEIGHT,
+            width=100,
+            font=_fnt,
+        )
+        self.ui_preset_menu.pack(side="left")
+        ToolTip(self.ui_preset_menu, "Change font size and window dimensions. Takes effect immediately.")
+
+        ctk.CTkLabel(
+            grp_appearance,
+            text="Small = compact  ·  Medium = comfortable  ·  Large = accessible",
+            font=_fnt_hint, text_color="gray"
+        ).pack(anchor="w", padx=7, pady=(0, 5))
 
         # --- Threads for watchers ---
         threading.Thread(target=self._watch_latest_chat, daemon=True).start()
@@ -847,14 +1231,12 @@ class TranslatedFileWatcher(ctk.CTk):
             self.logger.error(f"Version update message translation failed: {e}")
             translated_msg = msg
 
-        # redundant chat message message
-        # Insert into chat with proper styling
-        # self.text_area_tab1.configure(state="normal")
-        # self.text_area_tab1.insert("end", translated_msg, "version_update")
-        # self.text_area_tab1.configure(state="disabled")
-        # self.text_area_tab1.see("end")
-        # Ensure tag is configured
-        # self.text_area_tab1.tag_config("version_update", foreground="gold") #???
+        # Insert version update notification into chat
+        self.text_area_tab1.configure(state="normal")
+        self.text_area_tab1.insert("end", translated_msg, "version_update")
+        self.text_area_tab1.configure(state="disabled")
+        self.text_area_tab1.see("end")
+        self.text_area_tab1.tag_config("version_update", foreground="gold")
 
     def _toggle_help_content(self):
         """Switch between normal content and help content"""
@@ -952,6 +1334,28 @@ copies or substantial portions of the Software."""
         self.manual_link.pack(pady=1, padx=HELP_CONTENT_PADDING, anchor="w")
         self.manual_link.bind("<Button-1>", lambda e: self._open_link(USER_MANUAL_URL))
 
+        # Releases / Download Link
+        self.releases_link = ctk.CTkLabel(
+            links_frame,
+            text="• Releases / Download",
+            font=ctk.CTkFont(size=12),
+            text_color=LINK_COLOR,
+            cursor=LINK_CURSOR
+        )
+        self.releases_link.pack(pady=1, padx=HELP_CONTENT_PADDING, anchor="w")
+        self.releases_link.bind("<Button-1>", lambda e: self._open_link(RELEASES_URL))
+
+        # Issues Link
+        self.issues_link = ctk.CTkLabel(
+            links_frame,
+            text="• Report an Issue",
+            font=ctk.CTkFont(size=12),
+            text_color=LINK_COLOR,
+            cursor=LINK_CURSOR
+        )
+        self.issues_link.pack(pady=1, padx=HELP_CONTENT_PADDING, anchor="w")
+        self.issues_link.bind("<Button-1>", lambda e: self._open_link(ISSUES_URL))
+
         # Contact information moved to application info section
 
         # Version Check Section
@@ -1024,33 +1428,102 @@ copies or substantial portions of the Software."""
         try:
             if not text:
                 return text
-            translator = Translator()
-            result = run_async_translation(translator.translate(text, dest=dest))
-            if result and hasattr(result, "text"):
-                return result.text
+            if dest == "en":
+                # Every string passed here is a hardcoded or remote-fetched UI/welcome
+                # string authored in English — translating English to English is a
+                # no-op MyMemory rejects outright ("PLEASE SELECT TWO DISTINCT
+                # LANGUAGES"), so skip the round-trip. Does not apply to _manual_translate
+                # or live chat translation, where the source language is genuinely
+                # unknown and English-to-English is a legitimate possible outcome.
+                return text
+            outcome = self.translation_service.translate(
+                text, dest, email=self.settings.get("mymemory_email", "")
+            )
+            if outcome.ok:
+                return outcome.text
+            if outcome.detail:
+                self.logger.warning(f"Translation failed ({outcome.kind}): {outcome.detail}")
+            if outcome.new_pause:
+                self._announce_translation_pause()
         except Exception as e:
             self.logger.warning(f"Translation failed: {e}")
         return text
 
+
+    def _translate_for_display(self, text, target_lang):
+        """Translate chat/manual text; returns a TranslationOutcome whose .text is safe to
+        show (a translation, the unchanged original, or a short error label)."""
+        outcome = self.translation_service.translate(
+            text, target_lang, email=self.settings.get("mymemory_email", "")
+        )
+        if outcome.ok:
+            if self._status_shows_pause and not self.translation_service.is_paused():
+                self._status_shows_pause = False
+                self._set_status(STATUS_DEFAULT_TEXT)
+        elif outcome.detail:  # requests skipped during a pause have no detail — don't log each
+            self.logger.error(f"Translation error ({outcome.kind}): {outcome.detail}")
+        if outcome.new_pause:
+            self._announce_translation_pause()
+        return outcome
+
+    def _announce_translation_pause(self):
+        """One chat notice + status bar text per quota pause (not one per message)."""
+        until = datetime.fromtimestamp(self.translation_service.paused_until)
+        minutes = max(1, round((self.translation_service.paused_until - time.time()) / 60))
+        wait = f"about {minutes} min" if minutes < 90 else f"about {round(minutes / 60)} h"
+        msg = (
+            f"⚠ Translation paused: the free MyMemory limit has been reached "
+            f"(resumes in {wait}, ~{until:%H:%M}). Chat messages are still shown, untranslated."
+        )
+        if not self.settings.get("mymemory_email"):
+            msg += ("\n   Tip: add your email in Settings → Translation Service to raise the "
+                    "limit from 5,000 to 50,000 characters/day.")
+        self.logger.warning(f"Translation paused until {until:%Y-%m-%d %H:%M:%S} (quota reached)")
+        self._insert_message_tab1(msg + "\n", "translation_notice")
+        self._status_shows_pause = True
+        self._set_status(f"Translation paused – free daily limit reached (until ~{until:%H:%M})")
+
+    def _set_status(self, text):
+        try:
+            self.status_label.configure(text=text)
+        except Exception:
+            pass
+
+    def _save_mymemory_email(self):
+        email = self.mymemory_email_var.get().strip()
+        if not email:
+            self._clear_mymemory_email()
+            return
+        if not _is_valid_email(email):
+            self.mymemory_email_status.configure(text="That doesn't look like an email address — not saved.")
+            return
+        self.settings["mymemory_email"] = email
+        self._save_settings()
+        self.translation_service.resume()  # the higher quota applies immediately
+        self.mymemory_email_status.configure(text="Saved. Higher daily limit is active.")
+        self.logger.info("MyMemory email saved (higher daily limit)")  # never log the address
+
+    def _clear_mymemory_email(self):
+        self.mymemory_email_var.set("")
+        self.settings["mymemory_email"] = ""
+        self._save_settings()
+        self.mymemory_email_status.configure(text="Cleared. Using the anonymous daily limit.")
+        self.logger.info("MyMemory email cleared")
 
     def _manual_translate(self):
         text = self.manual_entry.get().strip()
         if not text:
             return
 
-        try:
-            translator = Translator()
-            result = run_async_translation(translator.translate(text, dest=self.manual_translate_lang))
-            translated = result.text
-        except Exception as e:
-            translated = f"[Translation error: {e}]"
-            self.logger.error(f"Manual translation error: {e}")
+        outcome = self._translate_for_display(text, self.manual_translate_lang)
+        translated = outcome.text
 
-        # Copy to clipboard
-        try:
-            pyperclip.copy(translated)
-        except Exception as e:
-            self.logger.warning(f"Clipboard copy failed: {e}")
+        # Copy to clipboard (never copy an error label)
+        if outcome.ok:
+            try:
+                pyperclip.copy(translated)
+            except Exception as e:
+                self.logger.warning(f"Clipboard copy failed: {e}")
 
         # Insert into chat area (but NOT DB)
         header_line = f"[Manual Translation → {self.manual_translate_lang.upper()}]"
@@ -1076,8 +1549,29 @@ copies or substantial portions of the Software."""
         return os.path.join(app_folder, "game_dictionary.json")
 
     def _get_default_logs_path(self):
-        user_home = os.path.expanduser("~")
-        return os.path.join(user_home, "Documents", "My Games", "StarConflict", "logs")
+        """New game location if present, else the legacy one if present, else the new one."""
+        new_path, legacy_path = _new_game_logs_path(), _legacy_game_logs_path()
+        if os.path.isdir(new_path):
+            return new_path
+        if os.path.isdir(legacy_path):
+            return legacy_path
+        return new_path
+
+    def _migrate_game_logs_path(self):
+        """Move a saved legacy default logs path to the game's new location — only if the
+        user never chose a custom folder and the new folder has a newer game session."""
+        saved = self.settings.get("game_logs_path")
+        new_path, legacy_path = _new_game_logs_path(), _legacy_game_logs_path()
+        if not saved or not _same_path(saved, legacy_path) or not os.path.isdir(new_path):
+            return False
+        new_latest = _latest_session_time(new_path)
+        legacy_latest = _latest_session_time(legacy_path)
+        if new_latest is None or (legacy_latest is not None and legacy_latest >= new_latest):
+            return False
+        self.settings["game_logs_path"] = new_path
+        self._save_settings()
+        self.logger.info(f"Game logs path migrated from {legacy_path} to {new_path}")
+        return True
 
     def _get_db_path(self):
         user_home = os.path.expanduser("~")
@@ -1086,8 +1580,10 @@ copies or substantial portions of the Software."""
         return os.path.join(db_dir, "chat_history.db")
 
     def _fetch_remote_dictionary(self):
-        """Download remote dictionary JSON if enabled."""
+        """Download remote dictionary JSON if enabled and interval has elapsed."""
         if not self.settings.get("allow_remote_dictionary", False):
+            return {}
+        if not self._should_fetch_remote():
             return {}
 
         url = self.settings.get("remote_dictionary_url", "")
@@ -1101,13 +1597,25 @@ copies or substantial portions of the Software."""
         return data
 
     def _merge_dictionaries(self, base: dict, remote: dict):
-        """Merge remote dictionary into base without overwriting (case-insensitive)."""
-        merged = dict(base)  # copy base
-        base_keys_lower = {k.lower() for k in base.keys()}
+        """Merge remote dictionary into base.
+        By default local entries take precedence (case-insensitive key comparison).
+        When settings['remote_dictionary_overrides_local'] is True, remote entries
+        replace local ones on conflict so the community dictionary always wins.
+        """
+        override = self.settings.get("remote_dictionary_overrides_local", False)
+        merged = dict(base)
+        base_keys_lower = {k.lower(): k for k in base.keys()}
 
         for key, val in remote.items():
-            if key.lower() not in base_keys_lower:
+            existing_key = base_keys_lower.get(key.lower())
+            if existing_key is None:
+                # New key — always add
                 merged[key] = val
+            elif override:
+                # Conflict and override enabled — remote wins, keep remote casing
+                del merged[existing_key]
+                merged[key] = val
+            # else: local wins, do nothing
         return merged
     
     def _load_settings(self):
@@ -1123,33 +1631,28 @@ copies or substantial portions of the Software."""
                 with open(self.settings_path, "r", encoding="utf-8") as f:
                     settings = json.load(f)
 
-                # Ensure backwards compatibility
+                # Ensure backwards compatibility: fill any missing keys with defaults
                 for key, value in DEFAULT_SETTINGS.items():
                     if key not in settings:
                         settings[key] = value
 
-                # Special handling for manual_languages - ensure it exists
-                if "manual_languages" not in settings:
-                    settings["manual_languages"] = DEFAULT_SETTINGS["manual_languages"]
-
-                # Ensure last_notified_version exists for backward compatibility
-                if "last_notified_version" not in settings:
+                # BF-5: Reset ghost last_notified_version.
+                # If a test/intermediate remote value was ever written that is higher than
+                # the current APP_VERSION, it would permanently suppress update notifications.
+                # Detect and correct it on first run of this version.
+                stored_notified = settings.get("last_notified_version", APP_VERSION)
+                if compare_versions(stored_notified, APP_VERSION) == 1:
+                    self.logger.info(
+                        f"Resetting ghost last_notified_version {stored_notified!r} → {APP_VERSION}"
+                    )
                     settings["last_notified_version"] = APP_VERSION
+                    settings["welcome_counter"] = 0
 
-                # Ensure remote fetch settings exist for performance optimization
-                if "last_remote_fetch" not in settings:
-                    settings["last_remote_fetch"] = 0
-                if "remote_fetch_interval" not in settings:
-                    settings["remote_fetch_interval"] = 3600
-
-                # Handle migration from old welcome_message_override to new structure
-                if "welcome_message_override" in settings:
-                    # Migrate old content to remote_welcome_message if it's not already set
-                    old_content = settings.get("welcome_message_override", "").strip()
-                    if old_content and not settings.get("remote_welcome_message"):
-                        settings["remote_welcome_message"] = old_content
-                    # Remove the old field to clean up
-                    del settings["welcome_message_override"]
+                # The remote dictionary moved from jsonsilo.com to the GitHub repository.
+                # Only the old default is replaced; a custom URL is left alone.
+                if settings.get("remote_dictionary_url") in LEGACY_REMOTE_DICTIONARY_URLS:
+                    settings["remote_dictionary_url"] = DEFAULT_REMOTE_DICTIONARY_URL
+                    self.logger.info("Remote dictionary URL migrated to the GitHub repository")
 
                 return settings
             except Exception as e:
@@ -1162,6 +1665,9 @@ copies or substantial portions of the Software."""
             for key, value in DEFAULT_SETTINGS.items():
                 if key not in self.settings:
                     self.settings[key] = value
+
+            # Always reflect the current binary version (never frozen at install-time value)
+            self.settings["app_version"] = APP_VERSION
 
             with open(self.settings_path, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, indent=4)
@@ -1181,7 +1687,7 @@ copies or substantial portions of the Software."""
                 raw = resp.read().decode("utf-8", errors="replace")
             return json.loads(raw)
         except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError) as e:
-            self.logger.warning(f"Remote welcome fetch failed: {e}")
+            self.logger.warning(f"Remote fetch failed ({url[:60]}): {e}")
             return None
 
     def _should_fetch_remote(self):
@@ -1203,22 +1709,17 @@ copies or substantial portions of the Software."""
         """
         Check for remote welcome message and version updates.
         Handles backward compatibility with old JSON format.
-        Includes performance optimization with fetch interval checking.
+        Rate-limited by _should_fetch_remote() to once per remote_fetch_interval (default 1 hour).
+        Safe to call from a background thread; any GUI update must go through self.after().
         """
-        # TEMPORARILY DISABLE FETCH INTERVAL FOR DEBUGGING
-        # For welcome messages, use a shorter interval (5 minutes) to allow more frequent checks
-        # last_fetch = self.settings.get("last_remote_fetch", 0)
-        # current_time = time.time()
-        # welcome_interval = 300  # 5 minutes for welcome messages
-
-        # if current_time - last_fetch <= welcome_interval:
-        #     self.logger.info(f"Skipping remote fetch - last fetch was {current_time - last_fetch:.0f} seconds ago (interval: {welcome_interval}s)")
-        #     return False
+        if not self._should_fetch_remote():
+            self.logger.info("Skipping remote fetch — interval not elapsed")
+            return False
 
         url = DEFAULT_REMOTE_WELCOME_URL
         data = self._fetch_remote_json(url)
 
-        # Always update fetch time, even if fetch failed
+        # Update fetch timestamp after the attempt (success or failure)
         self._update_fetch_time()
 
         if not data:
@@ -1229,23 +1730,12 @@ copies or substantial portions of the Software."""
         if isinstance(data, list) and data:
             data = data[0]
 
-        self.logger.info(f"=== RAW REMOTE DATA RECEIVED ===")
-        self.logger.info(f"Data type: {type(data)}")
-        self.logger.info(f"Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
-        for key, value in data.items():
-            if key == 'welcome_message':
-                self.logger.info(f"{key}: (length: {len(str(value))})")
-            else:
-                self.logger.info(f"{key}: {value}")
-
         # Get welcome message (now the main content is in 'welcome_message')
         welcome_msg = data.get('welcome_message', '').strip()
         new_color = str(data.get("color", "DodgerBlue")).strip() or "DodgerBlue"
         new_id = str(data.get("id", "")).strip()
 
-        self.logger.info(f"=== PROCESSED DATA ===")
-        self.logger.info(f"Remote data: id={new_id}, welcome_msg_length={len(welcome_msg)}, color={new_color}")
-        self.logger.info(f"Welcome message preview: '{welcome_msg[:100]}...'")
+        self.logger.info(f"Remote data received: id={new_id}, msg_len={len(welcome_msg)}, color={new_color}")
 
         # Initialize update flags
         welcome_update_needed = False
@@ -1278,14 +1768,6 @@ copies or substantial portions of the Software."""
             notes_changed = new_notes != current_notes
 
             content_changed = welcome_changed or whats_new_changed or download_changed or notes_changed
-
-            self.logger.info(f"=== CONTENT COMPARISON DEBUG ===")
-            self.logger.info(f"ID comparison: prev_id={prev_id}, new_id={new_id}, is_newer={is_newer_id}, is_older={is_older_id}")
-            self.logger.info(f"Welcome changed: '{current_welcome[:30]}...' != '{welcome_msg[:30]}...' = {welcome_changed}")
-            self.logger.info(f"Whats new changed: {whats_new_changed}")
-            self.logger.info(f"Download changed: {download_changed}")
-            self.logger.info(f"Notes changed: {notes_changed}")
-            self.logger.info(f"Overall content_changed: {content_changed}")
 
             # Check if welcome update is needed
             welcome_update_needed = ((is_newer_id or is_older_id) or content_changed) and welcome_msg.strip()
@@ -1334,21 +1816,87 @@ copies or substantial portions of the Software."""
             self.logger.info(f"No updates needed - welcome: {welcome_update_needed}, version: {version_update_needed}")
             return False
 
-    def _load_dictionary(self):
-        # Load local dictionary first
+    def _load_local_dictionary(self):
+        """Load only the local game_dictionary.json — no network calls."""
         if not os.path.exists(self.dictionary_path):
             default_dict = DEFAULT_DICTIONARY.copy()
             with open(self.dictionary_path, "w", encoding="utf-8") as f:
                 json.dump(default_dict, f, indent=4)
-            base_dict = default_dict
-        else:
-            with open(self.dictionary_path, "r", encoding="utf-8") as f:
-                base_dict = json.load(f)
+            return default_dict
+        with open(self.dictionary_path, "r", encoding="utf-8") as f:
+            return json.load(f)
 
-        # Optionally merge remote
+    def _load_dictionary(self):
+        """Load local dictionary and merge with remote if enabled and interval elapsed."""
+        base_dict = self._load_local_dictionary()
         remote_dict = self._fetch_remote_dictionary()
+        return self._merge_dictionaries(base_dict, remote_dict)
+
+    def _remote_startup_fetch(self):
+        """Runs in a background daemon thread after the window is shown.
+        Fetches remote welcome/version data and optionally the remote dictionary.
+        All GUI updates are marshalled back to the main thread via self.after().
+        """
+        self._check_remote_welcome()
+        if self.settings.get("allow_remote_dictionary", False):
+            remote = self._fetch_remote_dictionary()
+            if remote:
+                self.after(0, self._apply_remote_dictionary_result, remote)
+
+    def _apply_remote_dictionary_result(self, remote_dict):
+        """Called on the main thread after a successful background dictionary fetch.
+        Merges remote entries into the in-memory dictionary and persists new entries to disk
+        so they are available on the next offline start.
+        """
+        base_dict = self._load_local_dictionary()
         merged = self._merge_dictionaries(base_dict, remote_dict)
-        return merged
+        self.game_dictionary = merged
+        self._rebuild_dict_patterns()
+
+        # Persist merged result so offline starts benefit from remote entries too
+        try:
+            with open(self.dictionary_path, "w", encoding="utf-8") as f:
+                json.dump(merged, f, ensure_ascii=False, indent=4)
+            self.logger.info(
+                f"Remote dictionary merged and saved: {len(remote_dict)} remote entries, "
+                f"{len(merged)} total in {self.dictionary_path}"
+            )
+            # UI-6: update sync status label if it exists (Settings tab)
+            if hasattr(self, "dict_sync_status"):
+                from datetime import datetime as _dt
+                self.dict_sync_status.configure(
+                    text=f"Last sync: {_dt.now().strftime('%H:%M')}  ({len(remote_dict)} entries)",
+                    text_color="lightgreen"
+                )
+        except Exception as e:
+            self.logger.error(f"Failed to persist merged dictionary: {e}")
+            if hasattr(self, "dict_sync_status"):
+                self.dict_sync_status.configure(text="Sync failed", text_color="red")
+
+    def _sync_remote_dictionary_now(self):
+        """Force an immediate remote dictionary fetch, bypassing the rate-limit interval.
+        Called from the 'Sync Now' button. Runs the fetch in a background thread
+        and updates the UI status label when done.
+        """
+        if not self.settings.get("allow_remote_dictionary", False):
+            self.status_label.configure(text="Remote dictionary is disabled in settings")
+            return
+
+        self.dict_sync_status.configure(text="Syncing...", text_color="gray")
+        self.btn_sync_dict.configure(state="disabled")
+
+        def _do_sync():
+            url = self.settings.get("remote_dictionary_url", "")
+            data = self._fetch_remote_json(url)
+            if data and isinstance(data, dict):
+                self.after(0, self._apply_remote_dictionary_result, data)
+                # status label updated inside _apply_remote_dictionary_result
+            else:
+                self.after(0, lambda: self.dict_sync_status.configure(
+                    text="Sync failed — check connection", text_color="red"))
+            self.after(0, lambda: self.btn_sync_dict.configure(state="normal"))
+
+        threading.Thread(target=_do_sync, daemon=True).start()
 
     # ---------------- Logger ----------------
     def _init_logger(self):
@@ -1402,11 +1950,21 @@ copies or substantial portions of the Software."""
             conn.close()
 
     # ---------------- Dictionary substitution ----------------
+    def _rebuild_dict_patterns(self):
+        """Pre-compile regex patterns for all dictionary keys.
+        Call whenever self.game_dictionary is replaced.
+        """
+        self._dict_patterns = [
+            (re.compile(re.escape(k), re.IGNORECASE), v)
+            for k, v in self.game_dictionary.items()
+        ]
+
     def _apply_game_dictionary(self, text):
+        """Apply all dictionary substitutions to text using cached compiled patterns."""
+        if not hasattr(self, "_dict_patterns"):
+            self._rebuild_dict_patterns()
         processed = text
-        for key, replacement in self.game_dictionary.items():
-            # Replace ignoring case
-            pattern = re.compile(re.escape(key), re.IGNORECASE)
+        for pattern, replacement in self._dict_patterns:
             processed = pattern.sub(replacement, processed)
         return processed
 
@@ -1423,50 +1981,59 @@ copies or substantial portions of the Software."""
         except Exception as e:
             self.logger.error(f"Failed to open dictionary file: {e}")
 
-    def _update_dictionary_entry(self):
+    def _add_dictionary_entry(self):
+        """Add a new key→value entry to the local dictionary file, then reload into memory."""
         key = self.dict_key_entry.get().strip()
         value = self.dict_value_entry.get().strip()
 
+        if not key or not value:
+            self.status_label.configure(text="Enter both Key and Value to add an entry")
+            return
+
         try:
-            if key and value:
-                # --- Case 1: Add/update dictionary entry
-                self.game_dictionary[key] = value
+            # Load current local file, add/overwrite the entry, save back
+            local_dict = self._load_local_dictionary()
+            local_dict[key] = value
+            with open(self.dictionary_path, "w", encoding="utf-8") as f:
+                json.dump(local_dict, f, ensure_ascii=False, indent=4)
 
-                with open(self.dictionary_path, "w", encoding="utf-8") as f:
-                    json.dump(self.game_dictionary, f, ensure_ascii=False, indent=4)
-
-                self.logger.info(f"Dictionary updated: {key} → {value}")
-                self.status_label.configure(text=f"Dictionary updated: {key} → {value}")
-
-            else:
-                # --- Case 2: Reload dictionary from file
-                self.logger.info("Reloading dictionary from file...")
-                self.status_label.configure(text="Dictionary reloaded from file")
-
-            # --- In both cases: reload into memory
-            self.game_dictionary = self._load_dictionary()
-
+            # Reload in-memory dictionary (local file only; remote will re-merge on next fetch)
+            self.game_dictionary = self._load_local_dictionary()
+            self._rebuild_dict_patterns()
+            self.logger.info(f"Dictionary entry added: {key!r} → {value!r}")
+            self.status_label.configure(text=f"Added: {key} → {value}")
         except Exception as e:
-            self.logger.error(f"Failed to update/reload dictionary: {e}")
-            self.status_label.configure(text="Failed to update/reload dictionary")
-
+            self.logger.error(f"Failed to add dictionary entry: {e}")
+            self.status_label.configure(text="Failed to add dictionary entry")
         finally:
-            # Always clear fields after action
             self.dict_key_entry.delete(0, "end")
             self.dict_value_entry.delete(0, "end")
 
     def _reload_dictionary(self):
+        """Reload dictionary from disk (local file only)."""
         try:
-            self.game_dictionary = self._load_dictionary()
-            self.logger.info("Custom game dictionary reloaded")
-            self.status_label.configure(text="Dictionary reloaded successfully")
+            self.game_dictionary = self._load_local_dictionary()
+            self._rebuild_dict_patterns()
+            self.logger.info("Game dictionary reloaded from disk")
+            self.status_label.configure(text="Dictionary reloaded from disk")
         except Exception as e:
             self.logger.error(f"Failed to reload dictionary: {e}")
             self.status_label.configure(text="Failed to reload dictionary")
 
+    # Keep for backward compatibility with any calls from _apply_settings_changes
+    def _update_dictionary_entry(self):
+        """Legacy combined handler — delegates to _add_dictionary_entry or _reload_dictionary."""
+        key = self.dict_key_entry.get().strip()
+        value = self.dict_value_entry.get().strip()
+        if key and value:
+            self._add_dictionary_entry()
+        else:
+            self._reload_dictionary()
+
     def _apply_settings_changes(self):
         self.settings = self._load_settings()
-        self.game_dictionary = self._load_dictionary()
+        self.game_dictionary = self._load_local_dictionary()
+        self._rebuild_dict_patterns()
         self.languages = self.settings["languages"]
         self.language_menu.configure(values=list(self.languages.keys()))
         self.language_var.set(self.settings["last_language"])
@@ -1479,9 +2046,45 @@ copies or substantial portions of the Software."""
         self.manual_lang_var.set(self._get_short_code_for_lang(self.manual_translate_lang))
         self.btn_translate.configure(text=self._get_short_code_for_lang(self.manual_translate_lang))
 
+        # Sync UI toggle states with reloaded settings
+        self.remote_dict_var.set(self.settings.get("allow_remote_dictionary", False))
+        self.remote_override_var.set(self.settings.get("remote_dictionary_overrides_local", False))
+
         self.parent_folder = Path(self.settings["game_logs_path"])
         self.game_path_var.set(str(self.parent_folder))
+
+        # Sync UI preset selector
+        self.ui_preset_var.set(self.settings.get("ui_preset", UI_PRESET_DEFAULT))
+
+        self.mymemory_email_var.set(self.settings.get("mymemory_email", ""))
+
         self.logger.info("Settings & dictionary reloaded")
+
+    def _apply_ui_preset(self, preset_name: str) -> None:
+        """Apply a UI size preset immediately: update fonts, window geometry, persist."""
+        global APP_FONT_SIZE, APP_FONT_SIZE_SMALL, APP_FONT_SIZE_GROUP
+        preset = UI_PRESETS.get(preset_name)
+        if preset is None:
+            return
+        # Update globals so future one-off CTkFont() calls (e.g. close-confirm popup) use correct size
+        APP_FONT_SIZE       = preset["font"]
+        APP_FONT_SIZE_SMALL = preset["font_small"]
+        APP_FONT_SIZE_GROUP = preset["font_group"]
+        # Update shared font objects in-place — all referencing widgets repaint immediately
+        self._fnt.configure(size=preset["font"])
+        self._fnt_grp.configure(size=preset["font_group"])
+        self._fnt_hint.configure(size=preset["font_small"])
+        # Resize window (minsize first to avoid geometry being rejected by old minimum)
+        w, h = preset["width"], preset["height"]
+        self.minsize(w, h)
+        self.geometry(f"{w}x{h}")
+        # Resize tab segment buttons
+        for btn in self.tabview._segmented_button._buttons_dict.values():
+            btn.configure(width=preset["tab_w"], height=preset["tab_h"])
+        # Persist
+        self.settings["ui_preset"] = preset_name
+        self._save_settings()
+        self.logger.info(f"UI preset changed to '{preset_name}'")
 
     def _change_language(self, choice):
         self.target_lang = self.languages[choice]
@@ -1588,8 +2191,19 @@ copies or substantial portions of the Software."""
 
     def _watch_latest_chat(self):
         file_handle = None
+        waiting_shown = False
         while not self.stop_flag:
             logfile = self._get_latest_logfile()
+            # Tell the user when there is nothing to watch (e.g. wrong logs folder),
+            # but never overwrite a translation-pause message.
+            if logfile is None and file_handle is None and not waiting_shown:
+                waiting_shown = True
+                if not self._status_shows_pause:
+                    self._set_status(STATUS_NO_CHAT_LOG_TEXT)
+            elif logfile is not None and waiting_shown:
+                waiting_shown = False
+                if not self._status_shows_pause:
+                    self._set_status(STATUS_DEFAULT_TEXT)
             if logfile and logfile != self.current_logfile:
                 self.current_logfile = logfile
                 if file_handle:
@@ -1616,13 +2230,7 @@ copies or substantial portions of the Software."""
                         ts, username, message_text, header_line, message_line = parsed
                         processed_message = self._apply_game_dictionary(message_text)
 
-                        try:
-                            translator = Translator()
-                            result = run_async_translation(translator.translate(processed_message, dest=self.target_lang))
-                            translated = result.text
-                        except Exception as e:
-                            translated = f"[Translation error: {e}]"
-                            self.logger.error(f"Translation error: {e}")
+                        translated = self._translate_for_display(processed_message, self.target_lang).text
 
                         tag_name = f"translated_{self.target_lang}"
 
@@ -1712,13 +2320,18 @@ copies or substantial portions of the Software."""
         self.text_area_tab1.see("end")
         self.text_area_tab1.configure(state="disabled")
 
-    # ------------- Remote dictionary helper --------------
+    # ------------- Remote dictionary helpers --------------
     def _toggle_remote_dictionary(self):
         self.settings["allow_remote_dictionary"] = self.remote_dict_var.get()
         self._save_settings()
-        # reload immediately after switching
-        self.game_dictionary = self._load_dictionary()
         self.logger.info(f"Remote dictionary {'enabled' if self.remote_dict_var.get() else 'disabled'}")
+
+    def _toggle_remote_override(self):
+        self.settings["remote_dictionary_overrides_local"] = self.remote_override_var.get()
+        self._save_settings()
+        self.logger.info(
+            f"Remote dictionary override {'enabled' if self.remote_override_var.get() else 'disabled'}"
+        )
 
     # ---------------- Misc ----------------
     def _browse_game_folder(self):
@@ -1792,7 +2405,8 @@ copies or substantial portions of the Software."""
         popup.protocol("WM_DELETE_WINDOW", lambda: [popup.destroy(), self._unfreeze_window()])
 
         # Label
-        label = ctk.CTkLabel(popup, text="Are you sure you want to close the application?")
+        label = ctk.CTkLabel(popup, text="Are you sure you want to close the application?",
+                             font=ctk.CTkFont(size=APP_FONT_SIZE))
         label.pack(pady=20, padx=20)
 
         # Button frame
@@ -1801,15 +2415,18 @@ copies or substantial portions of the Software."""
 
         # Minimize button
         minimize_btn = ctk.CTkButton(button_frame, text="Minimize", width=80,
+                                   font=ctk.CTkFont(size=APP_FONT_SIZE),
                                    command=lambda: [self.iconify(), popup.destroy(), self._unfreeze_window()])
         minimize_btn.pack(side="left", padx=5)
 
         # Close button
-        close_btn = ctk.CTkButton(button_frame, text="Close", width=80, command=self._close_app)
+        close_btn = ctk.CTkButton(button_frame, text="Close", width=80,
+                                  font=ctk.CTkFont(size=APP_FONT_SIZE), command=self._close_app)
         close_btn.pack(side="left", padx=5)
 
         # Cancel button
         cancel_btn = ctk.CTkButton(button_frame, text="Cancel", width=80,
+                                 font=ctk.CTkFont(size=APP_FONT_SIZE),
                                  command=lambda: [popup.destroy(), self._unfreeze_window()])
         cancel_btn.pack(side="left", padx=5)
 
@@ -1870,7 +2487,7 @@ copies or substantial portions of the Software."""
 
     def _show_help_version_result(self, message):
         """Display version check result in help section"""
-        self.version_status_label.configure(text="Check complete")
+        self.version_status_label.configure(text=message)
         self.update_title_label.configure(text="")
         self.update_changes_label.configure(text="")
         self.update_download_label.configure(text="")
@@ -1930,6 +2547,11 @@ def resource_path(rel_path: str) -> str:
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base, rel_path)
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the `sc-chat-translator` console script (see pyproject.toml)."""
     app = TranslatedFileWatcher()
     app.mainloop()
+
+
+if __name__ == "__main__":
+    main()

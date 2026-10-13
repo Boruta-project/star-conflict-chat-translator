@@ -7,7 +7,8 @@ from PIL import Image
 import json
 import logging
 from logging.handlers import RotatingFileHandler
-from googletrans import Translator
+from translate import Translator as MyMemoryTranslator
+from translate.exceptions import TranslationError
 from pathlib import Path
 from tkinter import filedialog
 from datetime import datetime
@@ -16,7 +17,6 @@ import sqlite3
 import csv
 import pyperclip  # copy translated user entry to clipboard
 import webbrowser  # for opening links
-import asyncio
 
 # --- Libraries for HTTP fetch ---
 from urllib.request import urlopen, Request
@@ -26,7 +26,7 @@ from urllib.error import URLError, HTTPError
 # Global configuration
 # -----------------------
 
-APP_VERSION = "1.1.3"
+APP_VERSION = "1.4.0"
 APP_AUTHOR = "Hystrix"
 AUTHOR_EMAIL = "borutaproject@gmail.com"
 
@@ -55,16 +55,22 @@ HELP_CONTENT_PADDING = 15  # Padding for content areas eg 20
 # GUI configuration
 GUI_RESIZABLE = False  # Set to False by default for consistent layout
 
-DEFAULT_REMOTE_WELCOME_URL = "https://api.jsonsilo.com/public/d03caeff-8d84-4b55-bd8c-4b9ad6e7d372"
-DEFAULT_REMOTE_DICTIONARY_URL = "https://api.jsonsilo.com/public/245adbbb-9613-47ab-96bb-0e3e40385700"
+REMOTE_CONTENT_BASE_URL = "https://raw.githubusercontent.com/jacek-mar/star-conflict-chat-translator/main"
+DEFAULT_REMOTE_WELCOME_URL = f"{REMOTE_CONTENT_BASE_URL}/remote/welcome.json"
+DEFAULT_REMOTE_DICTIONARY_URL = f"{REMOTE_CONTENT_BASE_URL}/game_dictionary.json"
 
 # Project links
-PROJECT_REPOSITORY_URL = "https://github.com/boruta-project/star-conflict-chat-translator"
-USER_MANUAL_URL = "https://sites.google.com/view/sc-chat-translator/"
+PROJECT_REPOSITORY_URL = "https://github.com/jacek-mar/star-conflict-chat-translator"
+USER_MANUAL_URL = f"{PROJECT_REPOSITORY_URL}/blob/main/docs/user-guide.md"
 
 DEFAULT_SETTINGS = {
     "last_language": "English",
     "manual_translate_lang": "ru",
+    # Optional, empty by default (anonymous MyMemory quota: 5,000 chars/day). Setting a
+    # personal email here (edit settings.json manually) raises it to 50,000 chars/day —
+    # see docs/design-translate-library-migration.md. Never hard-code a shared email;
+    # each user should use their own, or none.
+    "mymemory_email": "",
     "languages": {
         "English": "en",
         "Spanish": "es",
@@ -204,25 +210,57 @@ DEFAULT_WELCOME_TEXT = (
     "This tool helps translate and manage in-game chat messages.\n"
     "It was created to improve the game experience for players from different countries.\n"
     "It is still in development and may contain minor bugs. Released under the MiT license. \n"
-    "The application uses the Google Translation engine and does not interfere with the game code.\n"
+    "The application uses a free translation service and does not interfere with the game code.\n"
     "Check your preferences in the Settings tab.\n\n"
     "Feel free to share your feedback about this program with me.\n"
     )
 
-def run_async_translation(coro):
-    """Helper to run async translation coroutines, handling event loop issues."""
+# EXPERIMENTAL (see docs/design-translate-library-migration.md): translation runs
+# through the `translate` package's MyMemory backend rather than Google. Google's free
+# scraping endpoints started blocking automated queries platform-wide in September 2026,
+# and deep-translator (a previous backend) is dormant with no fix. MyMemory is a
+# separate, independent service unaffected by that. Its own free-tier limits: ~500
+# chars/request, 5,000 chars/day anonymous (raised to 50,000/day with a registered
+# email — see the optional "mymemory_email" setting; never hard-code an email here, as
+# that would make every install of this app share one pool). from_lang="autodetect" is
+# MyMemory's own real (server-verified) auto-detect sentinel — not "auto".
+_MYMEMORY_AUTODETECT = "autodetect"
+
+# MyMemory doesn't publish a hard per-second cap the way Google's endpoint did, but
+# spacing calls out is still cheap, good API etiquette, and covers every call site
+# (main-thread startup sequence and the background chat-watch loop alike) with one
+# mechanism.
+_translate_lock = threading.Lock()
+_last_translate_call_ts = 0.0
+_MIN_SECONDS_BETWEEN_TRANSLATE_CALLS = 0.3
+
+
+def _throttle_translate_call():
+    """Block just long enough to keep translate calls spaced out app-wide."""
+    global _last_translate_call_ts
+    with _translate_lock:
+        wait = _last_translate_call_ts + _MIN_SECONDS_BETWEEN_TRANSLATE_CALLS - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_translate_call_ts = time.monotonic()
+
+
+# MyMemory refuses to "translate" text it auto-detects as already being in the target
+# language — e.g. short/ambiguous chat slang ("ping 200 xd") can be detected as matching
+# whatever language the user's target already is. Rather than a no-op, it raises this
+# exact error. That's not a real failure: the correct output IS the original text.
+_MYMEMORY_SAME_LANGUAGE_MESSAGE = "PLEASE SELECT TWO DISTINCT LANGUAGES"
+
+
+def _translate_text(text, target_lang, email=""):
+    """Translate text via MyMemory (through the `translate` package), auto-detecting source."""
+    _throttle_translate_call()
     try:
-        return asyncio.run(coro)
-    except RuntimeError as e:
-        if "Event loop is closed" in str(e) or "There is no current event loop" in str(e):
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(coro)
-            finally:
-                loop.close()
-        else:
-            raise
+        return MyMemoryTranslator(to_lang=target_lang, from_lang=_MYMEMORY_AUTODETECT, email=email).translate(text)
+    except TranslationError as e:
+        if _MYMEMORY_SAME_LANGUAGE_MESSAGE in str(e).upper():
+            return text
+        raise
 
 
 def compare_versions(remote_ver: str, local_ver: str) -> int:
@@ -322,7 +360,6 @@ class TranslatedFileWatcher(ctk.CTk):
 
         # --- Paths / translator / state ---
         self.parent_folder = Path(self.settings["game_logs_path"])
-        self.translator = Translator()
         self.stop_flag = False
         self.current_logfile = None
         self.session_id = None
@@ -1020,14 +1057,22 @@ copies or substantial portions of the Software."""
         self.update_notes_label.pack(anchor="w", pady=(2, 0))
 
     # Safer wrapper around translator.translate [hardcoded messages only]
+    # Safer wrapper around translator.translate [hardcoded messages only]
     def _safe_translate(self, text, dest):
         try:
             if not text:
                 return text
-            translator = Translator()
-            result = run_async_translation(translator.translate(text, dest=dest))
-            if result and hasattr(result, "text"):
-                return result.text
+            if dest == "en":
+                # Every string passed here is a hardcoded or remote-fetched UI/welcome
+                # string authored in English — translating English to English is a
+                # no-op MyMemory rejects outright ("PLEASE SELECT TWO DISTINCT
+                # LANGUAGES"), so skip the round-trip. Does not apply to _manual_translate
+                # or live chat translation, where the source language is genuinely
+                # unknown and English-to-English is a legitimate possible outcome.
+                return text
+            translated = _translate_text(text, dest, email=self.settings.get("mymemory_email", ""))
+            if translated:
+                return translated
         except Exception as e:
             self.logger.warning(f"Translation failed: {e}")
         return text
@@ -1039,9 +1084,9 @@ copies or substantial portions of the Software."""
             return
 
         try:
-            translator = Translator()
-            result = run_async_translation(translator.translate(text, dest=self.manual_translate_lang))
-            translated = result.text
+            translated = _translate_text(
+                text, self.manual_translate_lang, email=self.settings.get("mymemory_email", "")
+            )
         except Exception as e:
             translated = f"[Translation error: {e}]"
             self.logger.error(f"Manual translation error: {e}")
@@ -1617,9 +1662,10 @@ copies or substantial portions of the Software."""
                         processed_message = self._apply_game_dictionary(message_text)
 
                         try:
-                            translator = Translator()
-                            result = run_async_translation(translator.translate(processed_message, dest=self.target_lang))
-                            translated = result.text
+                            translated = _translate_text(
+                                processed_message, self.target_lang,
+                                email=self.settings.get("mymemory_email", "")
+                            )
                         except Exception as e:
                             translated = f"[Translation error: {e}]"
                             self.logger.error(f"Translation error: {e}")
@@ -1931,6 +1977,11 @@ def resource_path(rel_path: str) -> str:
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base, rel_path)
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the `sc-chat-translator` console script (see pyproject.toml)."""
     app = TranslatedFileWatcher()
     app.mainloop()
+
+
+if __name__ == "__main__":
+    main()

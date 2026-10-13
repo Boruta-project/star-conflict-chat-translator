@@ -51,9 +51,9 @@ class TestTranslatedFileWatcher:
         assert hasattr(app, 'settings')
         assert hasattr(app, 'game_dictionary')
 
-    def test_language_mappings(self):
+    def test_language_mappings(self, headless_app):
         """Test language code mappings."""
-        app = TranslatedFileWatcher()
+        app = headless_app
         assert 'English' in app.languages
         assert 'Russian' in app.languages
         assert app.languages['English'] == 'en'
@@ -79,7 +79,7 @@ class TestChatCategories:
         from main import CHAT_CATEGORIES
 
         # Test trading category
-        assert "#trading>" in CHAT_CATEGORIES
+        assert "#trading>[" in CHAT_CATEGORIES
         assert CHAT_CATEGORIES["#trading>["] == "Trading"
 
         # Test battle category

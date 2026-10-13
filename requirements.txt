@@ -8,7 +8,12 @@ customtkinter>=5.2.0
 Pillow>=9.0.0
 
 # Translation Services
-googletrans>=4.0.0rc1
+# EXPERIMENTAL — see docs/design-translate-library-migration.md. Uses the `translate`
+# package's MyMemory backend (free, no key, real auto-detect). Google's own free
+# translate endpoints started blocking automated queries platform-wide in Sept 2026.
+translate>=3.8.1,<4.0.0
+# HTTP client used by `translate`; imported directly to recognise network errors
+requests>=2.25.0
 
 # Clipboard Operations
 pyperclip>=1.8.0
