@@ -35,6 +35,8 @@ Version 1.3.0 switched to **MyMemory** so that the app keeps working with nothin
 
 If MyMemory turns out not to be good enough in real use, the next step would be support for an official API with your own key, not a return to the blocked free Google endpoints.
 
+**Planned (not available yet): other engines with your own key.** DeepL, Microsoft Translator and LibreTranslate could be added as an optional second engine, used when the MyMemory limit is reached. None of them currently offers a free key that is easy for players to get (most need an account with a payment card, or your own server), so this is postponed. The research and plan are in [plans/fallback-engines.md](plans/fallback-engines.md).
+
 ---
 
 ## How the free daily limit works
